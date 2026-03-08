@@ -55,17 +55,17 @@ function UI.create(state)
 		return btn
 	end
 
-	local bossBtn = makeButton("Auto Boss: OFF", 50)
-	local tBtn = makeButton("Auto T: OFF", 100)
+	local bossBtn = makeButton("Auto Boss From Loader: OFF", 50)
+	local tBtn = makeButton("Auto T From Loader : OFF", 100)
 
 	bossBtn.MouseButton1Click:Connect(function()
 		state.autoBoss = not state.autoBoss
-		bossBtn.Text = "Auto Boss: " .. (state.autoBoss and "ON" or "OFF")
+		bossBtn.Text = "Auto Boss From Loader: " .. (state.autoBoss and "ON" or "OFF")
 	end)
 
 	tBtn.MouseButton1Click:Connect(function()
 		state.autoPressT = not state.autoPressT
-		tBtn.Text = "Auto T: " .. (state.autoPressT and "ON" or "OFF")
+		tBtn.Text = "Auto T From Loader : " .. (state.autoPressT and "ON" or "OFF")
 	end)
 
 	return screenGui
