@@ -1,35 +1,15 @@
+print("Script started")
+
 local base = "https://raw.githubusercontent.com/rainza999/roblox-ui/main/src/StarterPlayer/StarterPlayerScripts/Modules/"
 
 local function loadModule(name)
 	local url = base .. name .. ".lua"
-	print("Loadingx module:", name)
-	print("URL:", url)
+	print("Loading:", name)
 
-	local okHttp, source = pcall(function()
-		return game:HttpGet(url, true)
-	end)
+	local src = game:HttpGet(url, true)
+	local fn = loadstring(src)
 
-	if not okHttp then
-		warn("HttpGet failed for " .. name, source)
-		return nil
-	end
-
-	print(name .. " source length:", #source)
-
-	local fn, loadErr = loadstring(source)
-	if not fn then
-		warn("loadstring failed for " .. name, loadErr)
-		return nil
-	end
-
-	local okRun, result = pcall(fn)
-	if not okRun then
-		warn("running module failed for " .. name, result)
-		return nil
-	end
-
-	print(name .. " loaded OK")
-	return result
+	return fn()
 end
 
 local State = loadModule("State")
@@ -37,14 +17,20 @@ local UI = loadModule("UI")
 local PressT = loadModule("PressT")
 local AutoAttackBoss = loadModule("AutoAttackBoss")
 
-print("State =", State)
-print("UI =", UI)
-print("PressT =", PressT)
-print("AutoAttackBoss =", AutoAttackBoss)
+UI.create(State)
 
-if UI and UI.create and State then
-	print("Calling UI.create(State)")
-	UI.create(State)
-else
-	warn("UI.create(State) skipped because UI or State invalid")
-end
+task.spawn(function()
+	while true do
+
+		if State.autoBoss then
+			AutoAttackBoss.run(State)
+		end
+
+		if State.autoPressT then
+			PressT.run(State)
+		end
+
+		task.wait(0.2)
+
+	end
+end)
