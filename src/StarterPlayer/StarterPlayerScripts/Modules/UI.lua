@@ -6,7 +6,7 @@ function UI.create(state)
 	local player = Players.LocalPlayer
 	local playerGui = player:WaitForChild("PlayerGui")
 
-	local oldGui = playerGui:FindFirstChild("ControlPanel")
+	local oldGui = playerGui:FindFirstChild("ControlPanel V.2")
 	if oldGui then
 		oldGui:Destroy()
 	end
