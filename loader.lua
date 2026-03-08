@@ -1,74 +1,50 @@
-local Players = game:GetService("Players")
+local base = "https://raw.githubusercontent.com/rainza999/roblox-ui/main/src/StarterPlayer/StarterPlayerScripts/Modules/"
 
-local UI = {}
+local function loadModule(name)
+	local url = base .. name .. ".lua"
+	print("Loading module:", name)
+	print("URL:", url)
 
-function UI.create(state)
-	local player = Players.LocalPlayer
-	local playerGui = player:WaitForChild("PlayerGui")
+	local okHttp, source = pcall(function()
+		return game:HttpGet(url, true)
+	end)
 
-	local oldGui = playerGui:FindFirstChild("ControlPanel")
-	if oldGui then
-		oldGui:Destroy()
+	if not okHttp then
+		warn("HttpGet failed for " .. name, source)
+		return nil
 	end
 
-	local screenGui = Instance.new("ScreenGui")
-	screenGui.Name = "ControlPanel"
-	screenGui.ResetOnSpawn = false
-	screenGui.Parent = playerGui
+	print(name .. " source length:", #source)
 
-	local frame = Instance.new("Frame")
-	frame.Size = UDim2.new(0, 260, 0, 180)
-	frame.Position = UDim2.new(0, 20, 0.5, -90)
-	frame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-	frame.Parent = screenGui
-
-	-- Title
-	local title = Instance.new("TextLabel")
-	title.Size = UDim2.new(1, -40, 0, 40)
-	title.BackgroundTransparency = 1
-	title.Text = "Control Panel"
-	title.TextColor3 = Color3.new(1, 1, 1)
-	title.TextSize = 20
-	title.TextXAlignment = Enum.TextXAlignment.Left
-	title.Position = UDim2.new(0, 10, 0, 0)
-	title.Parent = frame
-
-	-- Close Button
-	local closeBtn = Instance.new("TextButton")
-	closeBtn.Size = UDim2.new(0, 40, 0, 40)
-	closeBtn.Position = UDim2.new(1, -40, 0, 0)
-	closeBtn.Text = "X"
-	closeBtn.TextColor3 = Color3.new(1,1,1)
-	closeBtn.BackgroundColor3 = Color3.fromRGB(180,50,50)
-	closeBtn.Parent = frame
-
-	closeBtn.MouseButton1Click:Connect(function()
-		screenGui:Destroy()
-	end)
-
-	local function makeButton(text, y)
-		local btn = Instance.new("TextButton")
-		btn.Size = UDim2.new(1, -20, 0, 40)
-		btn.Position = UDim2.new(0, 10, 0, y)
-		btn.Text = text
-		btn.Parent = frame
-		return btn
+	local fn, loadErr = loadstring(source)
+	if not fn then
+		warn("loadstring failed for " .. name, loadErr)
+		return nil
 	end
 
-	local bossBtn = makeButton("Auto Boss From Loader: OFF", 50)
-	local tBtn = makeButton("Auto T From Loader : OFF", 100)
+	local okRun, result = pcall(fn)
+	if not okRun then
+		warn("running module failed for " .. name, result)
+		return nil
+	end
 
-	bossBtn.MouseButton1Click:Connect(function()
-		state.autoBoss = not state.autoBoss
-		bossBtn.Text = "Auto Boss From Loader: " .. (state.autoBoss and "ON" or "OFF")
-	end)
-
-	tBtn.MouseButton1Click:Connect(function()
-		state.autoPressT = not state.autoPressT
-		tBtn.Text = "Auto T From Loader : " .. (state.autoPressT and "ON" or "OFF")
-	end)
-
-	return screenGui
+	print(name .. " loaded OK")
+	return result
 end
 
-return UI
+local State = loadModule("State")
+local UI = loadModule("UI")
+local PressT = loadModule("PressT")
+local AutoAttackBoss = loadModule("AutoAttackBoss")
+
+print("State =", State)
+print("UI =", UI)
+print("PressT =", PressT)
+print("AutoAttackBoss =", AutoAttackBoss)
+
+if UI and UI.create and State then
+	print("Calling UI.create(State)")
+	UI.create(State)
+else
+	warn("UI.create(State) skipped because UI or State invalid")
+end
