@@ -1,5 +1,10 @@
 print("Script started")
+if getgenv().RobloxUIRunning then
+    getgenv().RobloxUIRunning = false
+    task.wait()
+end
 
+getgenv().RobloxUIRunning = true
 local base = "https://raw.githubusercontent.com/rainza999/roblox-ui/main/src/StarterPlayer/StarterPlayerScripts/Modules/"
 
 local function loadModule(name)
@@ -20,7 +25,7 @@ local AutoAttackBoss = loadModule("AutoAttackBoss")
 UI.create(State)
 
 task.spawn(function()
-	while true do
+	while getgenv().RobloxUIRunning do
 
 		if State.autoBoss then
 			AutoAttackBoss.run(State)

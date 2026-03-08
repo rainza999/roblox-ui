@@ -43,7 +43,11 @@ function UI.create(state)
 	closeBtn.Parent = frame
 
 	closeBtn.MouseButton1Click:Connect(function()
+
+		getgenv().RobloxUIRunning = false
+
 		screenGui:Destroy()
+
 	end)
 
 	local function makeButton(text, y)
