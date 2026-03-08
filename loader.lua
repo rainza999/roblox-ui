@@ -2,7 +2,7 @@ local base = "https://raw.githubusercontent.com/rainza999/roblox-ui/main/src/Sta
 
 local function loadModule(name)
 	local url = base .. name .. ".lua"
-	print("Loading module:", name)
+	print("Loadingx module:", name)
 	print("URL:", url)
 
 	local okHttp, source = pcall(function()
