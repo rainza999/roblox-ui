@@ -12,7 +12,7 @@ function UI.create(state)
 	end
 
 	local screenGui = Instance.new("ScreenGui")
-	screenGui.Name = "ControlPanel"
+	screenGui.Name = "ControlPanel V.2.1."
 	screenGui.ResetOnSpawn = false
 	screenGui.Parent = playerGui
 

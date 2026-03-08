@@ -12,20 +12,22 @@ UI.create(State)
 task.spawn(function()
 	while true do
 		if State.autoBoss then
+			print("Calling AutoAttackBoss.run")
 			local ok, err = pcall(function()
-				AutoAttackBoss.run()
+				AutoAttackBoss.run(State)
 			end)
 			if not ok then
-				warn("AutoAttackBoss error:", err)
+				warn("AutoAttackBoss.run error:", err)
 			end
 		end
 
 		if State.autoPressT then
+			print("Calling PressT.run")
 			local ok, err = pcall(function()
-				PressT.run()
+				PressT.run(State)
 			end)
 			if not ok then
-				warn("PressT error:", err)
+				warn("PressT.run error:", err)
 			end
 		end
 
