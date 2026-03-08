@@ -28,7 +28,7 @@ function UI.create(state)
 	title.Size = UDim2.new(1, -40, 0, 40)
 	title.Position = UDim2.new(0, 10, 0, 0)
 	title.BackgroundTransparency = 1
-	title.Text = "Control Panel"
+	title.Text = "Control Panel V.2.2"
 	title.TextColor3 = Color3.new(1, 1, 1)
 	title.TextSize = 20
 	title.TextXAlignment = Enum.TextXAlignment.Left
