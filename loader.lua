@@ -8,13 +8,13 @@ getgenv().RobloxUIRunning = true
 local base = "https://raw.githubusercontent.com/rainza999/roblox-ui/main/src/StarterPlayer/StarterPlayerScripts/Modules/"
 
 local function loadModule(name)
-	local url = base .. name .. ".lua"
-	print("Loading:", name)
 
-	local src = game:HttpGet(url, true)
-	local fn = loadstring(src)
+    local url = base .. name .. ".lua?t=" .. tostring(os.time())
 
-	return fn()
+    local src = game:HttpGet(url, true)
+
+    return loadstring(src)()
+
 end
 
 local State = loadModule("State")
