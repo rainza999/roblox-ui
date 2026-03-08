@@ -6,6 +6,11 @@ function UI.create(state)
 	local player = Players.LocalPlayer
 	local playerGui = player:WaitForChild("PlayerGui")
 
+	local oldGui = playerGui:FindFirstChild("ControlPanel")
+	if oldGui then
+		oldGui:Destroy()
+	end
+
 	local screenGui = Instance.new("ScreenGui")
 	screenGui.Name = "ControlPanel"
 	screenGui.ResetOnSpawn = false

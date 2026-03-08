@@ -1,35 +1,35 @@
-local base = "https://raw.githubusercontent.com/rainza999/roblox-ui/main/src/StarterPlayer/Modules/"
+local base = "https://raw.githubusercontent.com/rainza999/roblox-ui/main/src/StarterPlayer/StarterPlayerScripts/Modules/"
 
 local function loadModule(name)
-    local url = base .. name .. ".lua"
-    print("Loading module:", name)
-    print("URL:", url)
+	local url = base .. name .. ".lua"
+	print("Loading module:", name)
+	print("URL:", url)
 
-    local okHttp, source = pcall(function()
-        return game:HttpGet(url, true)
-    end)
+	local okHttp, source = pcall(function()
+		return game:HttpGet(url, true)
+	end)
 
-    if not okHttp then
-        warn("HttpGet failed for " .. name, source)
-        return nil
-    end
+	if not okHttp then
+		warn("HttpGet failed for " .. name, source)
+		return nil
+	end
 
-    print(name .. " source length:", #source)
+	print(name .. " source length:", #source)
 
-    local fn, loadErr = loadstring(source)
-    if not fn then
-        warn("loadstring failed for " .. name, loadErr)
-        return nil
-    end
+	local fn, loadErr = loadstring(source)
+	if not fn then
+		warn("loadstring failed for " .. name, loadErr)
+		return nil
+	end
 
-    local okRun, result = pcall(fn)
-    if not okRun then
-        warn("running module failed for " .. name, result)
-        return nil
-    end
+	local okRun, result = pcall(fn)
+	if not okRun then
+		warn("running module failed for " .. name, result)
+		return nil
+	end
 
-    print(name .. " loaded OK")
-    return result
+	print(name .. " loaded OK")
+	return result
 end
 
 local State = loadModule("State")
@@ -43,8 +43,8 @@ print("PressT =", PressT)
 print("AutoAttackBoss =", AutoAttackBoss)
 
 if UI and UI.create and State then
-    print("Calling UI.create(State)")
-    UI.create(State)
+	print("Calling UI.create(State)")
+	UI.create(State)
 else
-    warn("UI.create(State) skipped because UI or State invalid")
+	warn("UI.create(State) skipped because UI or State invalid")
 end
