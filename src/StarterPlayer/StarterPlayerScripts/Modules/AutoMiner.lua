@@ -14,19 +14,54 @@ function AutoMiner.run(State)
 	local currentMode = nil
 
     local getCharacter
-	local waitForPickaxeModel
-	local waitForWeaponModel
+    local hasEquippedMiningTool
+    local hasEquippedWeapon
+    local waitForEquippedObject
 
     getCharacter = function()
 		return player.Character or player.CharacterAdded:Wait()
 	end
 
+    hasEquippedMiningTool = function()
+        local character = getCharacter()
+
+        return character:FindFirstChild("PickAxe")
+            or character:FindFirstChild("PickaxeModel")
+    end
+
+    hasEquippedWeapon = function()
+        local character = getCharacter()
+
+        return character:FindFirstChild("Weapon")
+            or character:FindFirstChild("WeaponModel")
+    end
+
+    waitForEquippedObject = function(checkFn, timeout)
+        local deadline = tick() + (timeout or 2)
+
+        while tick() < deadline do
+            local obj = checkFn()
+            if obj then
+                return obj
+            end
+            task.wait(0.05)
+        end
+
+        return nil
+    end
+
 	local function pressKey(keyCode)
-		VirtualInputManager:SendKeyEvent(true, keyCode, false, game)
-		task.wait(0.05)
-		VirtualInputManager:SendKeyEvent(false, keyCode, false, game)
-		task.wait(0.1)
-	end
+        if not VirtualInputManager or not VirtualInputManager.SendKeyEvent then
+            warn("[AutoMiner] VirtualInputManager.SendKeyEvent unavailable")
+            return false
+        end
+
+        VirtualInputManager:SendKeyEvent(true, keyCode, false, game)
+        task.wait(0.05)
+        VirtualInputManager:SendKeyEvent(false, keyCode, false, game)
+        task.wait(0.1)
+        return true
+    end
 
     local function setMode(mode)
         if currentMode == mode then
@@ -35,37 +70,39 @@ function AutoMiner.run(State)
 
         if mode == "mining" then
             print("[AutoMiner] Switch mode -> mining")
-            print("[DEBUG] pressKey =", typeof(pressKey), pressKey)
-            print("[DEBUG] waitForPickaxeModel =", typeof(waitForPickaxeModel), waitForPickaxeModel)
-            print("[DEBUG] VirtualInputManager =", VirtualInputManager)
-            print("[DEBUG] SendKeyEvent =", VirtualInputManager and VirtualInputManager.SendKeyEvent)
 
-            pressKey(Enum.KeyCode.One)
+            local pressed = pressKey(Enum.KeyCode.One)
+            if not pressed then
+                warn("[AutoMiner] Failed to press key 1")
+                return false
+            end
 
-            local ok = waitForPickaxeModel(2)
+            local ok = waitForEquippedObject(hasEquippedMiningTool, 2)
             if ok then
                 currentMode = mode
+                print("[AutoMiner] Mining tool equipped:", ok.Name)
                 return true
             else
-                warn("[AutoMiner] PickaxeModel not found after pressing 1")
+                warn("[AutoMiner] Mining tool not found after pressing 1")
                 return false
             end
 
         elseif mode == "combat" then
             print("[AutoMiner] Switch mode -> combat")
-            print("[DEBUG] pressKey =", typeof(pressKey), pressKey)
-            print("[DEBUG] waitForWeaponModel =", typeof(waitForWeaponModel), waitForWeaponModel)
-            print("[DEBUG] VirtualInputManager =", VirtualInputManager)
-            print("[DEBUG] SendKeyEvent =", VirtualInputManager and VirtualInputManager.SendKeyEvent)
 
-            pressKey(Enum.KeyCode.Two)
+            local pressed = pressKey(Enum.KeyCode.Two)
+            if not pressed then
+                warn("[AutoMiner] Failed to press key 2")
+                return false
+            end
 
-            local ok = waitForWeaponModel(2)
+            local ok = waitForEquippedObject(hasEquippedWeapon, 2)
             if ok then
                 currentMode = mode
+                print("[AutoMiner] Weapon equipped:", ok.Name)
                 return true
             else
-                warn("[AutoMiner] WeaponModel not found after pressing 2")
+                warn("[AutoMiner] Weapon not found after pressing 2")
                 return false
             end
         end
