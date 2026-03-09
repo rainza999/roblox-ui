@@ -206,6 +206,13 @@ function PotionManager.run(State)
 
 	task.spawn(function()
 		while getgenv().RobloxUIRunning do
+            print(
+                "[PotionLoop]",
+                "autoUseLuck=", State.autoUseLuckPotion,
+                "autoBuyLuck=", State.autoBuyLuckPotion,
+                "autoUseMiner=", State.autoUseMinerPotion,
+                "autoBuyMiner=", State.autoBuyMinerPotion
+            )
 			if State.autoBuyLuckPotion then
 				ensurePotionStock("LuckPotion1")
 			end
