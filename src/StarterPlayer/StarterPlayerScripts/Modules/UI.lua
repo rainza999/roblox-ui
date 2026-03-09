@@ -42,6 +42,12 @@ function UI.create(state)
 		"Velchire",
 	}
 
+	local monsterNames = {
+		"Elite Orc",
+		"Yeti",
+		"Common Orc",
+	},
+
 	state.selectedLocations = state.selectedLocations or {}
 	for _, name in ipairs(locationNames) do
 		if state.selectedLocations[name] == nil then
@@ -60,6 +66,13 @@ function UI.create(state)
 	for _, name in ipairs(oreNames) do
 		if state.selectedOres[name] == nil then
 			state.selectedOres[name] = false
+		end
+	end
+
+	state.selectedMonsters = state.selectedMonsters or {}
+	for _, name in ipairs(monsterNames) do
+		if state.selectedMonsters[name] == nil then
+			state.selectedMonsters[name] = false
 		end
 	end
 
@@ -554,11 +567,19 @@ function UI.create(state)
 		190
 	)
 
-	local luckAutoBtn = makeButton("Auto Luck Potion: OFF", 480)
-	local luckBuyBtn = makeButton("Auto Buy Luck: OFF", 530)
+	local monsterSelect = createMultiSelect(
+		monsterNames,
+		state.selectedMonsters,
+		480,
+		"Select monsters...",
+		190
+	)
 
-	local minerPotionBtn = makeButton("Auto Miner Potion: OFF", 580)
-	local minerBuyBtn = makeButton("Auto Buy Miner: OFF", 630)
+	local luckAutoBtn = makeButton("Auto Luck Potion: OFF", 530)
+	local luckBuyBtn = makeButton("Auto Buy Luck: OFF", 580)
+
+	local minerPotionBtn = makeButton("Auto Miner Potion: OFF", 630)
+	local minerBuyBtn = makeButton("Auto Buy Miner: OFF", 690)
 
 	-- local function refreshButtons()
 	refreshButtons = function()
