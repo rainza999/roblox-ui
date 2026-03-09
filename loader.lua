@@ -8,6 +8,7 @@ getgenv().RobloxUIRunning = true
 local base = "https://raw.githubusercontent.com/rainza999/roblox-ui/main/src/StarterPlayer/StarterPlayerScripts/Modules/"
 
 local function loadModule(name)
+	parint("starting...")
     local url = base .. name .. ".lua?t=" .. tostring(os.time())
     print("Loading module:", name, url)
 
