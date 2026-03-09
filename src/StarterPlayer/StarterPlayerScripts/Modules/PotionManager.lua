@@ -2,6 +2,8 @@ local PotionManager = {}
 
 function PotionManager.run(State)
 	local ReplicatedStorage = game:GetService("ReplicatedStorage")
+	local Players = game:GetService("Players")
+	local player = Players.LocalPlayer
 
 	local ToolActivated = ReplicatedStorage
 		:WaitForChild("Shared")
@@ -21,67 +23,58 @@ function PotionManager.run(State)
 		:WaitForChild("RF")
 		:WaitForChild("Purchase")
 
-	local Players = game:GetService("Players")
-	local player = Players.LocalPlayer
-
 	local POTIONS = {
 		LuckPotion1 = {
 			name = "LuckPotion1",
-			maxStacks = 12, -- 60 min / 5 min
+			maxStacks = 12,       -- 60 min / 5 min
 			durationPerUse = 300, -- 5 min
-			buyAmount = 10,
+			targetStock = 10,     -- อยากให้เหลือ/เติมให้เต็ม 10
 		},
 		MinerPotion1 = {
 			name = "MinerPotion1",
-			maxStacks = 3, -- 15 min / 5 min
+			maxStacks = 3,        -- 15 min / 5 min
 			durationPerUse = 300, -- 5 min
-			buyAmount = 10,
+			targetStock = 10,     -- อยากให้เหลือ/เติมให้เต็ม 10
 		},
 	}
 
 	local potionState = {
 		LuckPotion1 = {
 			expiresAt = 0,
-			pendingUses = 0,
 			lastUseAt = 0,
 			lastBuyAt = 0,
 		},
 		MinerPotion1 = {
 			expiresAt = 0,
-			pendingUses = 0,
 			lastUseAt = 0,
 			lastBuyAt = 0,
 		},
 	}
 
-	local function getCharacter()
-		return player.Character or player.CharacterAdded:Wait()
-	end
-
 	local function findToolCount(toolName)
-		local character = getCharacter()
 		local backpack = player:FindFirstChildOfClass("Backpack")
-
-		local count = 0
-
-		if backpack then
-			for _, child in ipairs(backpack:GetChildren()) do
-				if child.Name == toolName then
-					count += 1
-				end
-			end
+		if not backpack then
+			return 0
 		end
 
-		for _, child in ipairs(character:GetChildren()) do
-			if child.Name == toolName then
-				count += 1
-			end
+		local item = backpack:FindFirstChild(toolName)
+		if not item then
+			return 0
 		end
 
-		return count
+		local countValue = item:FindFirstChild("Count")
+		if countValue and countValue:IsA("IntValue") then
+			return countValue.Value
+		end
+
+		return 0
 	end
 
 	local function buyPotion(toolName, amount)
+		if amount <= 0 then
+			return false
+		end
+
 		local ok, result = pcall(function()
 			return PurchaseRF:InvokeServer(toolName, amount)
 		end)
@@ -114,12 +107,18 @@ function PotionManager.run(State)
 		if not st then
 			return 0
 		end
+
 		return math.max(0, st.expiresAt - tick())
 	end
 
 	local function getRemainingStacks(toolName)
 		local cfg = POTIONS[toolName]
 		local remain = getRemainingSeconds(toolName)
+
+		if remain <= 0 then
+			return 0
+		end
+
 		return math.floor((remain + 1) / cfg.durationPerUse)
 	end
 
@@ -148,54 +147,95 @@ function PotionManager.run(State)
 		st.lastUseAt = now
 	end
 
-	local function ensurePotion(toolName, autoBuyEnabled)
+	local function ensurePotionStock(toolName)
 		local cfg = POTIONS[toolName]
 		local st = potionState[toolName]
+
+		local count = findToolCount(toolName)
+		local need = cfg.targetStock - count
+
+		if need <= 0 then
+			return
+		end
+
+		if tick() - st.lastBuyAt < 2 then
+			return
+		end
+
+		st.lastBuyAt = tick()
+
+		print("[PotionManager] Need buy:", toolName, need, "| current =", count, "| target =", cfg.targetStock)
+
+		local bought = buyPotion(toolName, need)
+		if bought then
+			task.wait(1)
+		end
+	end
+
+	local function ensurePotionBuff(toolName)
+		local st = potionState[toolName]
+		local count = findToolCount(toolName)
 
 		if not canUseMore(toolName) then
 			return
 		end
 
-		local count = findToolCount(toolName)
-
 		if count <= 0 then
-			if autoBuyEnabled and tick() - st.lastBuyAt > 2 then
-				st.lastBuyAt = tick()
-				local bought = buyPotion(toolName, cfg.buyAmount)
-				if bought then
-					task.wait(0.8)
-				end
-			end
 			return
 		end
 
-		if tick() - st.lastUseAt < 0.8 then
+		if tick() - st.lastUseAt < 4 then
 			return
 		end
 
 		local used = usePotion(toolName)
 		if used then
 			registerUse(toolName)
-			task.wait(0.5)
+
+			print(
+				"[Potion]",
+				toolName,
+				"stacks=", getRemainingStacks(toolName),
+				"remain=", math.floor(getRemainingSeconds(toolName)),
+				"bag=", findToolCount(toolName)
+			)
+
+			task.wait(4)
 		end
 	end
 
 	task.spawn(function()
 		while getgenv().RobloxUIRunning do
+			if State.autoBuyLuckPotion then
+				ensurePotionStock("LuckPotion1")
+			end
+
+			if State.autoBuyMinerPotion then
+				ensurePotionStock("MinerPotion1")
+			end
+
 			if State.autoUseLuckPotion then
-				ensurePotion("LuckPotion1", State.autoBuyLuckPotion)
+				ensurePotionBuff("LuckPotion1")
 			end
 
 			if State.autoUseMinerPotion then
-				ensurePotion("MinerPotion1", State.autoBuyMinerPotion)
+				ensurePotionBuff("MinerPotion1")
 			end
 
 			task.wait(1)
 		end
 	end)
 
-	PotionManager.buyPotion = buyPotion
+	PotionManager.buyPotion = function(toolName, amount)
+		return buyPotion(toolName, amount)
+	end
+
 	PotionManager.usePotion = function(toolName)
+		if POTIONS[toolName] and not canUseMore(toolName) then
+			print("[PotionManager] Potion already full:", toolName)
+			return false
+		end
+
 		local used = usePotion(toolName)
 		if used and POTIONS[toolName] then
 			registerUse(toolName)
