@@ -136,42 +136,55 @@ function AutoMonster.run(State)
 	end
 
 	local function followAndAttack(monster)
-		local _, humanoid, hrp = getCharacterParts()
+        local _, humanoid, hrp = getCharacterParts()
 
-		while getgenv().RobloxUIRunning and State.autoMonsterFarm and monster and monster.Parent do
-			if State.autoMiner then
-				return
-			end
+        local ATTACK_RANGE = 7
+        local STOP_DISTANCE = 4
+        local TELEPORT_IF_FAR = 22
 
-			local monsterHumanoid = findMonsterHumanoid(monster)
-			local monsterRoot = findMonsterRoot(monster)
+        while getgenv().RobloxUIRunning and State.autoMonsterFarm and monster and monster.Parent do
+            if State.autoMiner then
+                return
+            end
 
-			if not monsterHumanoid or not monsterRoot then
-				return
-			end
+            local monsterHumanoid = findMonsterHumanoid(monster)
+            local monsterRoot = findMonsterRoot(monster)
 
-			if monsterHumanoid.Health <= 0 then
-				return
-			end
+            if not monsterHumanoid or not monsterRoot then
+                return
+            end
 
-			local dist = (monsterRoot.Position - hrp.Position).Magnitude
+            if monsterHumanoid.Health <= 0 then
+                return
+            end
 
-			if dist > 6 then
-				humanoid:MoveTo(monsterRoot.Position)
-			end
+            local offset = monsterRoot.Position - hrp.Position
+            local dist = offset.Magnitude
 
-			local look = Vector3.new(monsterRoot.Position.X, hrp.Position.Y, monsterRoot.Position.Z)
-			hrp.CFrame = CFrame.lookAt(hrp.Position, look)
+            if dist > ATTACK_RANGE then
+                local dir = offset.Unit
+                local standPos = monsterRoot.Position - (dir * STOP_DISTANCE)
 
-			attack()
-			task.wait(0.15)
+                if dist > TELEPORT_IF_FAR then
+                    hrp.CFrame = CFrame.new(standPos, monsterRoot.Position)
+                    task.wait(0.08)
+                else
+                    humanoid:MoveTo(standPos)
+                    task.wait(0.12)
+                end
+            else
+                local look = Vector3.new(monsterRoot.Position.X, hrp.Position.Y, monsterRoot.Position.Z)
+                hrp.CFrame = CFrame.lookAt(hrp.Position, look)
+                attack()
+                task.wait(0.15)
+            end
 
-			local character = player.Character
-			if not character or humanoid.Health <= 0 then
-				_, humanoid, hrp = getCharacterParts()
-			end
-		end
-	end
+            local character = player.Character
+            if not character or humanoid.Health <= 0 then
+                _, humanoid, hrp = getCharacterParts()
+            end
+        end
+    end
 
 	task.spawn(function()
 		while getgenv().RobloxUIRunning do
