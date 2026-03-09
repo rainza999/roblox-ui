@@ -10,6 +10,13 @@ local State = {
 		["Medium Red Crystal"] = false,
 		["Medium Ice Crystal"] = false,
 		["Small Red Crystal"] = false,
+	},
+
+	selectedOres = {
+		["Gargantuan"] = false,
+		["Iceite"] = false,
+		["Etherealite"] = false,
+		["Velchire"] = false,
 	}
 }
 
