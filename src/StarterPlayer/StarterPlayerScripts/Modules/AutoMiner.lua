@@ -32,6 +32,21 @@ function AutoMiner.run(State)
 		end)
 	end
 
+    local function attack()
+		pcall(function()
+			ReplicatedStorage
+				:WaitForChild("Shared")
+				:WaitForChild("Packages")
+				:WaitForChild("Knit")
+				:WaitForChild("Services")
+				:WaitForChild("ToolService")
+				:WaitForChild("RF")
+				:WaitForChild("ToolActivated")
+				:InvokeServer("Weapon")
+		end)
+	end
+
+
 	local function getAllSpawnLocations()
 		local results = {}
 
@@ -327,7 +342,7 @@ function AutoMiner.run(State)
 			end
 
 			-- ตอนนี้ใช้ mining() ไปก่อน เพราะบางเกมใช้ ToolActivated ตัวเดียวกัน
-			mining()
+			attack()
 			task.wait(0.12)
 
 			if not isMonsterAlive(monster) then

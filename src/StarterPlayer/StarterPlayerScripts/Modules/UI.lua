@@ -549,6 +549,11 @@ function UI.create(state)
 		refreshButtons()
 	end)
 
+	defendBtn.MouseButton1Click:Connect(function()
+		state.autoDefend = not state.autoDefend
+		refreshButtons()
+	end)
+
 	local dragToggle = nil
 	local dragInput = nil
 	local dragStart = nil
