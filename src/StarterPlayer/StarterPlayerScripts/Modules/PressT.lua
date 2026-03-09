@@ -14,7 +14,8 @@ end
 function PressT.startAntiAFK()
 	task.spawn(function()
 		while getgenv().RobloxUIRunning do
-			task.wait(600) -- 10 นาที (600 วินาที)
+			print("START... PRESS T wait")
+			task.wait(60) -- 10 นาที (600 วินาที)
 
 			print("Anti AFK Trigger")
 
