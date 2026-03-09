@@ -561,9 +561,11 @@ function AutoMiner.run(State)
 
 			local finished = mineTarget(mineral)
 			if finished == false then
+                print("[AutoMiner] Skip mineral (wrong ore or timeout):", mineral.Name)
 				markMineralSkipped(mineral, 8)
 				task.wait(0.2)
 			else
+                print("[AutoMiner] Finished mining:", mineral.Name)
 				task.wait(0.2)
 			end
 		else
