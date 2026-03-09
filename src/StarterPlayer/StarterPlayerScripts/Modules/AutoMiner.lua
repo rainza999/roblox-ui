@@ -9,6 +9,33 @@ function AutoMiner.run(State)
 
 	local player = Players.LocalPlayer
 
+    	local VirtualInputManager = game:GetService("VirtualInputManager")
+
+	local currentMode = nil
+
+	local function pressKey(keyCode)
+		VirtualInputManager:SendKeyEvent(true, keyCode, false, game)
+		task.wait(0.05)
+		VirtualInputManager:SendKeyEvent(false, keyCode, false, game)
+		task.wait(0.1)
+	end
+
+	local function setMode(mode)
+		if currentMode == mode then
+			return
+		end
+
+		currentMode = mode
+
+		if mode == "mining" then
+			print("[AutoMiner] Switch mode -> mining")
+			pressKey(Enum.KeyCode.One)
+		elseif mode == "combat" then
+			print("[AutoMiner] Switch mode -> combat")
+			pressKey(Enum.KeyCode.Two)
+		end
+	end
+
 	local skippedMinerals = {}
 
 	local function getCharacterParts()
@@ -19,6 +46,7 @@ function AutoMiner.run(State)
 	end
 
 	local function mining()
+        setMode("mining")
 		pcall(function()
 			ReplicatedStorage
 				:WaitForChild("Shared")
@@ -33,6 +61,7 @@ function AutoMiner.run(State)
 	end
 
     local function attack()
+        setMode("combat")
 		pcall(function()
 			ReplicatedStorage
 				:WaitForChild("Shared")
