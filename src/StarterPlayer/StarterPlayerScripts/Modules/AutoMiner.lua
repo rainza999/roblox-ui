@@ -119,6 +119,10 @@ function AutoMiner.run(State)
 		return character, humanoid, hrp
 	end
 
+    local function isPausedForAutoMiner()
+        return State.pauseOwner ~= nil and State.pauseOwner ~= "AutoMiner"
+    end
+
 	local function mining()
 		local ok = setMode("mining")
 		if not ok then
@@ -491,26 +495,37 @@ function AutoMiner.run(State)
 	end
 
 	local function moveToTargetPart(targetPart, offsetZ)
-		local _, _, hrp = getCharacterParts()
+        if isPausedForAutoMiner() then
+            return false
+        end
 
-		if not targetPart then
-			return false
-		end
+        local _, _, hrp = getCharacterParts()
 
-		local targetCF = targetPart.CFrame * CFrame.new(0, 0, offsetZ or 4)
-		local dist = (targetCF.Position - hrp.Position).Magnitude
+        if not targetPart then
+            return false
+        end
 
-		local tween = TweenService:Create(
-			hrp,
-			TweenInfo.new(math.max(dist / 60, 0.05)),
-			{ CFrame = targetCF }
-		)
+        local targetCF = targetPart.CFrame * CFrame.new(0, 0, offsetZ or 4)
+        local dist = (targetCF.Position - hrp.Position).Magnitude
 
-		tween:Play()
-		tween.Completed:Wait()
+        local tween = TweenService:Create(
+            hrp,
+            TweenInfo.new(math.max(dist / 60, 0.05)),
+            { CFrame = targetCF }
+        )
 
-		return true
-	end
+        tween:Play()
+
+        while tween.PlaybackState == Enum.PlaybackState.Playing do
+            if isPausedForAutoMiner() then
+                tween:Cancel()
+                return false
+            end
+            task.wait(0.05)
+        end
+
+        return not isPausedForAutoMiner()
+    end
 
     local function faceTargetPart(targetPart)
         local character, humanoid, hrp = getCharacterParts()
@@ -534,7 +549,10 @@ function AutoMiner.run(State)
 		local timeout = tick() + 12
 
 		while getgenv().RobloxUIRunning and State.autoMiner and monster and monster.Parent and tick() < timeout do
-			if not isMonsterAlive(monster) then
+			if isPausedForAutoMiner() then
+                return false
+            end
+            if not isMonsterAlive(monster) then
 				return true
 			end
 
@@ -550,6 +568,10 @@ function AutoMiner.run(State)
 				moveToTargetPart(part, 4)
 			end
 
+            if isPausedForAutoMiner() then
+                return false
+            end
+            
 			-- ตอนนี้ใช้ mining() ไปก่อน เพราะบางเกมใช้ ToolActivated ตัวเดียวกัน
 			attack()
 			task.wait(0.12)
@@ -575,6 +597,10 @@ function AutoMiner.run(State)
 	end
 
 	local function handleNearbyMonster()
+        if isPausedForAutoMiner() then
+            return false
+        end
+
         if not State.autoDefend then
             return false
         end
@@ -747,7 +773,10 @@ function AutoMiner.run(State)
 		local lastHp = getMinerHealth(mineral)
 
 		while getgenv().RobloxUIRunning and State.autoMiner and mineral and mineral.Parent and tick() < timeout do
-			-- ถ้ามีมอนเข้ามาใกล้ ให้ไปจัดมอนก่อน แล้วค่อยกลับมา
+            if isPausedForAutoMiner() then
+                return false
+            end
+            -- ถ้ามีมอนเข้ามาใกล้ ให้ไปจัดมอนก่อน แล้วค่อยกลับมา
 			handleNearbyMonster()
 
 			if not isMinerAlive(mineral) then
@@ -783,6 +812,10 @@ function AutoMiner.run(State)
 						return false
 					end
 				end
+			end
+
+            if isPausedForAutoMiner() then
+				return false
 			end
 
             faceTargetPart(targetPart)
@@ -833,7 +866,13 @@ function AutoMiner.run(State)
 
 		local timeout = tick() + 20
 		while getgenv().RobloxUIRunning and State.autoClearTrash and mineral and mineral.Parent and tick() < timeout do
-			handleNearbyMonster()
+			
+            if isPausedForAutoMiner() then
+                State.isClearing = false
+                State.clearStatusText = ""
+                return false
+            end
+            handleNearbyMonster()
 
 			if not isMinerAlive(mineral) then
 				print("[AutoMiner] Clear finished:", mineralName or mineral.Name)
@@ -864,6 +903,12 @@ function AutoMiner.run(State)
 				faceTargetPart(targetPart)
 			end
 
+            if isPausedForAutoMiner() then
+				State.isClearing = false
+				State.clearStatusText = ""
+				return false
+			end
+
 			faceTargetPart(targetPart)
 			mining()
 			task.wait(0.15)
@@ -875,6 +920,12 @@ function AutoMiner.run(State)
 	end
 
 	while getgenv().RobloxUIRunning do
+
+        if isPausedForAutoMiner() then
+            task.wait(0.1)
+            continue
+        end
+
 		if not State.autoMiner then
 			task.wait(0.2)
 			continue
@@ -902,14 +953,17 @@ function AutoMiner.run(State)
 			moveToMiner(mineral)
 
 			local finished = mineTarget(mineral)
-			if finished == false then
+
+            if isPausedForAutoMiner() then
+                task.wait(0.1)
+            elseif finished == false then
                 print("[AutoMiner] Skip mineral (wrong ore or timeout):", mineral.Name)
-				markMineralSkipped(mineral, 8)
-				task.wait(0.2)
-			else
+                markMineralSkipped(mineral, 8)
+                task.wait(0.2)
+            else
                 print("[AutoMiner] Finished mining:", mineral.Name)
-				task.wait(0.2)
-			end
+                task.wait(0.2)
+            end
 		else
 			warn("No selected mineral found")
 			task.wait(0.5)
