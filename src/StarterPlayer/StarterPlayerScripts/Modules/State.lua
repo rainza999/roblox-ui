@@ -29,7 +29,7 @@ local State = {
 		["Etherealite"] = false,
 		["Iceite"] = false,
 		["Velchire"] = false,
-	}
+	},
 
 	clearLimits = {
 		["Floating Crystal"] = 0,
