@@ -154,7 +154,8 @@ function PotionManager.run(State)
         local bookPos = getPotionShopBookPosition()
 
         if not hrp or not bookPos then
-            warn("[PotionShop] Book position not found")
+            debugPotionShopBooks()
+            warn("[PotionShop] Book position not found DEBUG")
             return false
         end
 
