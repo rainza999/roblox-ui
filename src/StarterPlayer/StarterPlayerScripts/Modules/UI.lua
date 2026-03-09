@@ -70,7 +70,7 @@ function UI.create(state)
 		return s
 	end
 
-	local expandedHeight = 420
+	local expandedHeight = 560
 	local collapsedHeight = 48
 	local isCollapsed = false
 
@@ -134,7 +134,7 @@ function UI.create(state)
 	content.Size = UDim2.new(1, 0, 1, -46)
 	content.Position = UDim2.new(0, 0, 0, 46)
 	content.BackgroundTransparency = 1
-	content.ClipsDescendants = true
+	content.ClipsDescendants = false
 	content.Parent = frame
 
 	local function makeButton(text, y)
@@ -505,7 +505,7 @@ function UI.create(state)
 	local oreSelect = createMultiSelect(
 		oreNames,
 		state.selectedOres,
-		220,
+		250,
 		"Select ores...",
 		190
 	)
