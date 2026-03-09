@@ -117,6 +117,76 @@ function PotionManager.run(State)
 		return shop:GetPivot().Position
 	end
 
+    local function getPotionShopBookPosition()
+        local shops = workspace:FindFirstChild("Shops")
+        if not shops then
+            return nil
+        end
+
+        local shop = shops:FindFirstChild("Potion Shop")
+        if not shop then
+            return nil
+        end
+
+        local hrp = getHRP()
+        if not hrp then
+            return nil
+        end
+
+        local nearestPos = nil
+        local nearestDist = math.huge
+
+        for _, obj in ipairs(shop:GetDescendants()) do
+            if obj.Name == "Book" and obj:IsA("BasePart") then
+                local dist = (obj.Position - hrp.Position).Magnitude
+                if dist < nearestDist then
+                    nearestDist = dist
+                    nearestPos = obj.Position
+                end
+            end
+        end
+
+        return nearestPos
+    end
+
+    local function moveNearBookForMinerPotion()
+        local hrp = getHRP()
+        local bookPos = getPotionShopBookPosition()
+
+        if not hrp or not bookPos then
+            warn("[PotionShop] Book position not found")
+            return false
+        end
+
+        local dist = (hrp.Position - bookPos).Magnitude
+        print("[PotionShop] nearest Book dist =", math.floor(dist))
+
+        if dist <= 6 then
+            return true
+        end
+
+        -- ขยับไปชิดหนังสือมากขึ้น
+        -- ใช้ offset เล็กมาก เพื่อให้เกือบติดจุด
+        local dir = (bookPos - hrp.Position)
+        if dir.Magnitude > 0 then
+            dir = dir.Unit
+        else
+            dir = Vector3.new(0, 0, -1)
+        end
+
+        local targetPos = bookPos - (dir * 1.5) + Vector3.new(0, 2.5, 0)
+
+        print("[PotionShop] tweening close to Book for MinerPotion...")
+        local ok = tweenToPosition(targetPos, 80)
+        if not ok then
+            warn("[PotionShop] tween to Book failed")
+            return false
+        end
+
+        task.wait(0.2)
+        return true
+    end
+
 	local function tweenToPosition(targetPos, speed)
 		local hrp = getHRP()
 		if not hrp then
@@ -185,32 +255,42 @@ function PotionManager.run(State)
 		return (hrp.Position - targetPos).Magnitude <= 10
 	end
 
-	local function ensureNearPotionShop()
-		local shopPos = getPotionShopPosition()
-		local hrp = getHRP()
+	local function ensureNearPotionShop(toolName)
+        toolName = toolName or ""
 
-		if not shopPos or not hrp then
-			warn("[PotionShop] missing shopPos or hrp")
-			return false
-		end
+        local shopPos = getPotionShopPosition()
+        local hrp = getHRP()
 
-		local dist = (hrp.Position - shopPos).Magnitude
-		if dist <= 15 then
-			return true
-		end
+        if not shopPos or not hrp then
+            warn("[PotionShop] missing shopPos or hrp")
+            return false
+        end
 
-		local targetPos = shopPos + Vector3.new(0, 3, 6)
-		print("[PotionShop] tweening to shop, dist =", math.floor(dist))
+        local dist = (hrp.Position - shopPos).Magnitude
+        if dist > 15 then
+            local targetPos = shopPos + Vector3.new(0, 3, 6)
+            print("[PotionShop] tweening to shop, dist =", math.floor(dist))
 
-		local ok = tweenToPosition(targetPos, 100)
-		if not ok then
-			warn("[PotionShop] tween failed")
-			return false
-		end
+            local ok = tweenToPosition(targetPos, 100)
+            if not ok then
+                warn("[PotionShop] tween failed")
+                return false
+            end
 
-		task.wait(0.25)
-		return true
-	end
+            task.wait(0.2)
+        end
+
+        -- ถ้าเป็น MinerPotion ให้ขยับชิด Book อีกที
+        if toolName == "MinerPotion1" then
+            local ok = moveNearBookForMinerPotion()
+            if not ok then
+                warn("[PotionShop] failed to move close enough to Book for MinerPotion")
+                return false
+            end
+        end
+
+        return true
+    end
 
 	local function findToolInstance(toolName)
 		local backpack = getBackpack()
@@ -377,7 +457,7 @@ function PotionManager.run(State)
 			st.lastBuyAt = now()
 			st.lastActionAt = now()
 
-			if not ensureNearPotionShop() then
+			if not ensureNearPotionShop(toolName) then
 				return
 			end
 
