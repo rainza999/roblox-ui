@@ -1,8 +1,28 @@
 local PressT = {}
 
 function PressT.tap()
+	local VirtualInputManager = game:GetService("VirtualInputManager")
+
 	print("Pressed T")
-	-- ใส่ logic ของคุณในโปรเจกต์ตัวเองตรงนี้
+
+	-- กด T
+	VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.T, false, game)
+	task.wait(0.1)
+	VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.T, false, game)
+end
+
+function PressT.startAntiAFK()
+	task.spawn(function()
+		while getgenv().RobloxUIRunning do
+			task.wait(600) -- 10 นาที (600 วินาที)
+
+			print("Anti AFK Trigger")
+
+			PressT.tap()
+			task.wait(0.5)
+			PressT.tap()
+		end
+	end)
 end
 
 return PressT
