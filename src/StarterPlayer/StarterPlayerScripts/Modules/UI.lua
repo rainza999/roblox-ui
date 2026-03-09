@@ -668,6 +668,7 @@ function UI.create(state)
 
 	tBtn.MouseButton1Click:Connect(function()
 		state.autoPressT = not state.autoPressT
+		print("autoPressT =", state.autoPressT)
 		refreshButtons()
 	end)
 

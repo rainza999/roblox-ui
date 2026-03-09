@@ -37,6 +37,7 @@ local AutoMiner = loadModule("AutoMiner")
 local AutoMonster = loadModule("AutoMonster")
 local PotionManager = loadModule("PotionManager")
 
+PressT.start(State)
 PotionManager.run(State)
 
 task.spawn(function()
