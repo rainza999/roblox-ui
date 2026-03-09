@@ -2,7 +2,13 @@ local PressT = {}
 local started = false
 
 function PressT.tap()
-	print("Pressed T")
+	local VirtualInputManager = game:GetService("VirtualInputManager")
+
+	print("Pressed TTTT")
+
+	VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.T, false, game)
+	task.wait(0.1)
+	VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.T, false, game)
 end
 
 function PressT.start(State)
