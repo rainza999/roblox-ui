@@ -226,16 +226,25 @@ function AutoMiner.run(State)
 	end
 
 	local function hasMatchingSelectedOre(mineral)
-		local oreNames = getOreNamesFromMineral(mineral)
+        for _, obj in ipairs(mineral:GetDescendants()) do
+            if obj:IsA("Model") and obj.Name == "Ore" then
+                local oreName = obj:GetAttribute("Ore")
 
-		for _, oreName in ipairs(oreNames) do
-			if State.selectedOres and State.selectedOres[oreName] then
-				return true, oreName
-			end
-		end
+                if oreName then
+                    print("[AutoMiner] Ore spawned:", oreName)
 
-		return false, nil
-	end
+                    if State.selectedOres and State.selectedOres[oreName] then
+                        print("[AutoMiner] Ore matched:", oreName)
+                        return true, oreName
+                    else
+                        print("[AutoMiner] Ore not selected:", oreName)
+                    end
+                end
+            end
+        end
+
+        return false, nil
+    end
 
 	-- =========================
 	-- MONSTER LOGIC
@@ -556,7 +565,8 @@ function AutoMiner.run(State)
 		local mineral, locationName = findMineral()
 
 		if mineral then
-			print("Found mineral:", mineral.Name, "at", locationName)
+			print("[AutoMiner] Found mineral:", mineral.Name, "| Location:", locationName)
+            print("[AutoMiner] Start mining:", mineral.Name)
 			moveToMiner(mineral)
 
 			local finished = mineTarget(mineral)
