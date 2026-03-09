@@ -29,8 +29,9 @@ function UI.create(state)
 
 	local oreNames = {
 		"Gargantuan",
-		"Iceite",
+		"Suryafal",
 		"Etherealite",
+		"Iceite",
 		"Velchire",
 	}
 
