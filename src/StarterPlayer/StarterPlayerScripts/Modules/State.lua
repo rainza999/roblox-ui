@@ -6,7 +6,7 @@ local State = {
 	autoClearTrash = false,
 
 	isClearing = false,
-	clearStatusText = ","
+	clearStatusText = "",
 
 	selectedLocations = {
 		["Island3CavePeakBarrier"] = false,
