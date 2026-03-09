@@ -20,13 +20,14 @@ function AutoMiner.run(State)
 		pcall(function()
 			ReplicatedStorage
 				:WaitForChild("Shared")
-				:WaitForChild("Packages")
-				:WaitForChild("Knit")
-				:WaitForChild("Services")
-				:WaitForChild("ToolService")
-				:WaitForChild("RF")
-				:WaitForChild("ToolActivated")
-				:InvokeServer("Weapon")
+                :WaitForChild("Packages")
+                :WaitForChild("Knit")
+                :WaitForChild("Services")
+                :WaitForChild("ToolService")
+                :WaitForChild("RF")
+                :WaitForChild("ToolActivated")
+                :InvokeServer("Pickaxe")
+
 		end)
 	end
 
