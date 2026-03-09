@@ -2,6 +2,7 @@ local State = {
 	autoBoss = false,
 	autoPressT = false,
 	autoMiner = false,
+	autoDefend = false,
 
 	selectedMinerals = {
 		["Floating Crystal"] = true,

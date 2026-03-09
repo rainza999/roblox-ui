@@ -208,6 +208,167 @@ function AutoMiner.run(State)
 		return false, nil
 	end
 
+	-- =========================
+	-- MONSTER LOGIC
+	-- =========================
+
+	local function getMonsterPart(model)
+		if not model then
+			return nil
+		end
+
+		if model:IsA("BasePart") then
+			return model
+		end
+
+		if model:IsA("Model") then
+			return model.PrimaryPart
+				or model:FindFirstChild("HumanoidRootPart")
+				or model:FindFirstChildWhichIsA("BasePart")
+		end
+
+		return nil
+	end
+
+	local function isMonsterAlive(monster)
+		if not monster or not monster.Parent then
+			return false
+		end
+
+		local humanoid = monster:FindFirstChildOfClass("Humanoid")
+		if humanoid then
+			return humanoid.Health > 0
+		end
+
+		local hpAttr = monster:GetAttribute("Health")
+		if type(hpAttr) == "number" then
+			return hpAttr > 0
+		end
+
+		local hpObj = monster:FindFirstChild("Health")
+		if hpObj and (hpObj:IsA("NumberValue") or hpObj:IsA("IntValue")) then
+			return hpObj.Value > 0
+		end
+
+		return monster.Parent ~= nil
+	end
+
+	local function isOwnCharacterModel(model)
+		local character = player.Character
+		return character and model == character
+	end
+
+	local function findNearbyMonster(maxDistance)
+		local living = workspace:FindFirstChild("Living")
+		if not living then
+			return nil
+		end
+
+		local _, _, hrp = getCharacterParts()
+		local nearestMonster = nil
+		local nearestDistance = maxDistance or 20
+
+		for _, mob in ipairs(living:GetChildren()) do
+			if mob:IsA("Model") and not isOwnCharacterModel(mob) and isMonsterAlive(mob) then
+				local part = getMonsterPart(mob)
+				if part then
+					local dist = (part.Position - hrp.Position).Magnitude
+					if dist <= nearestDistance then
+						nearestDistance = dist
+						nearestMonster = mob
+					end
+				end
+			end
+		end
+
+		return nearestMonster
+	end
+
+	local function moveToTargetPart(targetPart, offsetZ)
+		local _, _, hrp = getCharacterParts()
+
+		if not targetPart then
+			return false
+		end
+
+		local targetCF = targetPart.CFrame * CFrame.new(0, 0, offsetZ or 4)
+		local dist = (targetCF.Position - hrp.Position).Magnitude
+
+		local tween = TweenService:Create(
+			hrp,
+			TweenInfo.new(math.max(dist / 60, 0.05)),
+			{ CFrame = targetCF }
+		)
+
+		tween:Play()
+		tween.Completed:Wait()
+
+		return true
+	end
+
+	local function attackMonster(monster)
+		local timeout = tick() + 12
+
+		while State.autoMiner and monster and monster.Parent and tick() < timeout do
+			if not isMonsterAlive(monster) then
+				return true
+			end
+
+			local part = getMonsterPart(monster)
+			if not part then
+				return true
+			end
+
+			local _, _, hrp = getCharacterParts()
+			local dist = (part.Position - hrp.Position).Magnitude
+
+			if dist > 10 then
+				moveToTargetPart(part, 4)
+			end
+
+			-- ตอนนี้ใช้ mining() ไปก่อน เพราะบางเกมใช้ ToolActivated ตัวเดียวกัน
+			mining()
+			task.wait(0.12)
+
+			if not isMonsterAlive(monster) then
+				return true
+			end
+
+			-- ถ้ามอนหลุดไปไกลมาก ถือว่าพอแล้ว กลับไปตีหิน
+			local _, _, hrp2 = getCharacterParts()
+			local part2 = getMonsterPart(monster)
+			if not part2 then
+				return true
+			end
+
+			local dist2 = (part2.Position - hrp2.Position).Magnitude
+			if dist2 > 35 then
+				return false
+			end
+		end
+
+		return false
+	end
+
+	local function handleNearbyMonster()
+        if not State.autoDefend then
+            return false
+        end
+
+        local monster = findNearbyMonster(18)
+        if not monster then
+            return false
+        end
+
+        print("Nearby monster detected:", monster.Name)
+        attackMonster(monster)
+        return true
+    end
+
+	-- =========================
+	-- MINERAL FINDING
+	-- =========================
+
 	local function findMineral()
 		local spawnLocations = getAllSpawnLocations()
 		if #spawnLocations == 0 then
@@ -249,26 +410,11 @@ function AutoMiner.run(State)
 	end
 
 	local function moveToMiner(mineral)
-		local _, _, hrp = getCharacterParts()
 		local targetPart = getMinerPart(mineral)
-
 		if not targetPart then
 			return false
 		end
-
-		local targetCF = targetPart.CFrame * CFrame.new(0, 0, 4)
-		local dist = (targetCF.Position - hrp.Position).Magnitude
-
-		local tween = TweenService:Create(
-			hrp,
-			TweenInfo.new(math.max(dist / 60, 0.05)),
-			{ CFrame = targetCF }
-		)
-
-		tween:Play()
-		tween.Completed:Wait()
-
-		return true
+		return moveToTargetPart(targetPart, 4)
 	end
 
 	local function mineTarget(mineral)
@@ -278,6 +424,9 @@ function AutoMiner.run(State)
 		local lastHp = getMinerHealth(mineral)
 
 		while State.autoMiner and mineral and mineral.Parent and tick() < timeout do
+			-- ถ้ามีมอนเข้ามาใกล้ ให้ไปจัดมอนก่อน แล้วค่อยกลับมา
+			handleNearbyMonster()
+
 			if not isMinerAlive(mineral) then
 				return true
 			end
@@ -298,19 +447,14 @@ function AutoMiner.run(State)
 				end
 			end
 
-			-- ถ้าเปิด ore filter อยู่ ให้เช็คตอน ore เริ่ม spawn
 			if oreMode then
 				local oreSpawned = hasAnyOreSpawned(mineral)
 
 				if oreSpawned then
 					foundOreOnce = true
 
-					local matched, matchedName = hasMatchingSelectedOre(mineral)
-
-					if matched then
-						-- print("Matched ore:", matchedName)
-					else
-						-- เกิด ore แล้ว แต่ไม่มีตัวที่เลือกไว้เลย -> ข้ามก้อนนี้
+					local matched = hasMatchingSelectedOre(mineral)
+					if not matched then
 						return false
 					end
 				end
@@ -356,6 +500,11 @@ function AutoMiner.run(State)
 		end
 
 		cleanupSkippedMinerals()
+
+		-- ก่อนหาแร่ใหม่ เช็คมอนรอบตัวก่อน
+		if handleNearbyMonster() then
+			task.wait(0.1)
+		end
 
 		local mineral = findMineral()
 

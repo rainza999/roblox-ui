@@ -70,7 +70,7 @@ function UI.create(state)
 		return s
 	end
 
-	local expandedHeight = 560
+	local expandedHeight = 620
 	local collapsedHeight = 48
 	local isCollapsed = false
 
@@ -493,11 +493,13 @@ function UI.create(state)
 	local bossBtn = makeButton("Auto Boss: OFF", 10)
 	local tBtn = makeButton("Auto T: OFF", 60)
 	local minerBtn = makeButton("Auto Miner: OFF", 110)
+	local defendBtn = makeButton("Auto Defend: OFF", 160)
+
 
 	local mineralSelect = createMultiSelect(
 		mineralNames,
 		state.selectedMinerals,
-		165,
+		215,
 		"Select minerals...",
 		190
 	)
@@ -505,7 +507,7 @@ function UI.create(state)
 	local oreSelect = createMultiSelect(
 		oreNames,
 		state.selectedOres,
-		250,
+		270,
 		"Select ores...",
 		190
 	)
@@ -525,6 +527,11 @@ function UI.create(state)
 		tBtn.BackgroundColor3 = state.autoPressT
 			and Color3.fromRGB(40, 140, 70)
 			or Color3.fromRGB(60, 60, 60)
+
+		defendBtn.Text = "Auto Defend: " .. (state.autoDefend and "ON" or "OFF")
+		defendBtn.BackgroundColor3 = state.autoDefend
+			and Color3.fromRGB(40, 140, 70)
+			or Color3.fromRGB(60, 60, 60)	
 	end
 
 	bossBtn.MouseButton1Click:Connect(function()
