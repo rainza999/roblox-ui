@@ -254,10 +254,30 @@ function PotionManager.run(State)
 
 		return (hrp.Position - targetPos).Magnitude <= 10
 	end
+    local function debugPotionShopBooks()
+        local shops = workspace:FindFirstChild("Shops")
+        if not shops then
+            warn("[PotionShop] Shops not found")
+            return
+        end
 
+        local shop = shops:FindFirstChild("Potion Shop")
+        if not shop then
+            warn("[PotionShop] Potion Shop not found")
+            return
+        end
+
+        print("=== Potion Shop Descendants ===")
+        for _, obj in ipairs(shop:GetDescendants()) do
+            if string.find(obj.Name:lower(), "book") then
+                print(obj:GetFullName(), "| class =", obj.ClassName)
+            end
+        end
+    end
+    
 	local function ensureNearPotionShop(toolName)
         toolName = toolName or ""
-
+        debugPotionShopBooks()
         local shopPos = getPotionShopPosition()
         local hrp = getHRP()
 
