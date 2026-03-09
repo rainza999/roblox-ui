@@ -85,7 +85,7 @@ function UI.create(state)
 		return s
 	end
 
-	local expandedHeight = 820
+	local expandedHeight = 950
 	local collapsedHeight = 48
 	local isCollapsed = false
 
@@ -152,7 +152,11 @@ function UI.create(state)
 		state.autoClearTrash = false
 		state.isClearing = false
 		state.clearStatusText = "Stopped"
+		state.autoUseLuckPotion = false
+		state.autoBuyLuckPotion = false
 
+		state.autoUseMinerPotion = false
+		state.autoBuyMinerPotion = false
 		refreshButtons()
 
 		screenGui:Destroy()
@@ -549,6 +553,12 @@ function UI.create(state)
 		190
 	)
 
+	local luckAutoBtn = makeButton("Auto Luck Potion: OFF", 430)
+	local luckBuyBtn = makeButton("Auto Buy Luck: OFF", 480)
+
+	local minerPotionBtn = makeButton("Auto Miner Potion: OFF", 530)
+	local minerBuyBtn = makeButton("Auto Buy Miner: OFF", 580)
+
 	-- local function refreshButtons()
 	refreshButtons = function()
 		local minerText = state.autoMiner and "ON" or "OFF"
@@ -584,14 +594,26 @@ function UI.create(state)
 			and Color3.fromRGB(40, 140, 70)
 			or Color3.fromRGB(60, 60, 60)
 
-		-- if state.isClearing then
-		-- 	statusLabel.Text = "Status: " .. (state.clearStatusText ~= "" and state.clearStatusText or "Clearing...")
-		-- 	statusLabel.TextColor3 = Color3.fromRGB(255, 210, 120)
-		-- else
-		-- 	statusLabel.Text = "Status: Idle"
-		-- 	statusLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
-		-- end
+		luckAutoBtn.Text = "Auto Luck Potion: " .. (state.autoUseLuckPotion and "ON" or "OFF")
+		luckAutoBtn.BackgroundColor3 = state.autoUseLuckPotion
+			and Color3.fromRGB(40,140,70)
+			or Color3.fromRGB(60,60,60)
 
+		luckBuyBtn.Text = "Auto Buy Luck: " .. (state.autoBuyLuckPotion and "ON" or "OFF")
+		luckBuyBtn.BackgroundColor3 = state.autoBuyLuckPotion
+			and Color3.fromRGB(40,140,70)
+			or Color3.fromRGB(60,60,60)
+
+		minerPotionBtn.Text = "Auto Miner Potion: " .. (state.autoUseMinerPotion and "ON" or "OFF")
+		minerPotionBtn.BackgroundColor3 = state.autoUseMinerPotion
+			and Color3.fromRGB(40,140,70)
+			or Color3.fromRGB(60,60,60)
+
+		minerBuyBtn.Text = "Auto Buy Miner: " .. (state.autoBuyMinerPotion and "ON" or "OFF")
+		minerBuyBtn.BackgroundColor3 = state.autoBuyMinerPotion
+			and Color3.fromRGB(40,140,70)
+			or Color3.fromRGB(60,60,60)
+			
 		if statusLabel then
 			if state.isClearing then
 				statusLabel.Text = "Status: " .. (state.clearStatusText ~= "" and state.clearStatusText or "Clearing...")
@@ -625,6 +647,26 @@ function UI.create(state)
 
 	clearBtn.MouseButton1Click:Connect(function()
 		state.autoClearTrash = not state.autoClearTrash
+		refreshButtons()
+	end)
+
+	luckAutoBtn.MouseButton1Click:Connect(function()
+		state.autoUseLuckPotion = not state.autoUseLuckPotion
+		refreshButtons()
+	end)
+
+	luckBuyBtn.MouseButton1Click:Connect(function()
+		state.autoBuyLuckPotion = not state.autoBuyLuckPotion
+		refreshButtons()
+	end)
+
+	minerPotionBtn.MouseButton1Click:Connect(function()
+		state.autoUseMinerPotion = not state.autoUseMinerPotion
+		refreshButtons()
+	end)
+
+	minerBuyBtn.MouseButton1Click:Connect(function()
+		state.autoBuyMinerPotion = not state.autoBuyMinerPotion
 		refreshButtons()
 	end)
 

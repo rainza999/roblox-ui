@@ -119,36 +119,6 @@ function AutoMiner.run(State)
 		return character, humanoid, hrp
 	end
 
-    waitForPickaxeModel = function(timeout)
-		local character = getCharacter()
-		local deadline = tick() + (timeout or 2)
-
-		while tick() < deadline do
-			local pickaxeModel = character:FindFirstChild("PickaxeModel")
-			if pickaxeModel then
-				return pickaxeModel
-			end
-			task.wait(0.05)
-		end
-
-		return nil
-	end
-
-	waitForWeaponModel = function(timeout)
-		local character = getCharacter()
-		local deadline = tick() + (timeout or 2)
-
-		while tick() < deadline do
-			local weaponModel = character:FindFirstChild("WeaponModel")
-			if weaponModel then
-				return weaponModel
-			end
-			task.wait(0.05)
-		end
-
-		return nil
-	end
-
 	local function mining()
 		local ok = setMode("mining")
 		if not ok then

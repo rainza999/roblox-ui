@@ -33,8 +33,13 @@ local UI = loadModule("UI")
 local PressT = loadModule("PressT")
 local AutoAttackBoss = loadModule("AutoAttackBoss")
 local AutoMiner = loadModule("AutoMiner")
+local PotionManager = loadModule("PotionManager")
 
-UI.create(State)
+PotionManager.run(State)
+task.spawn(function()
+	AutoMiner.run(State)
+end)
+UI.create(State,PotionManager,AutoMiner)
 
 task.spawn(function()
 	while getgenv().RobloxUIRunning do
@@ -46,11 +51,6 @@ task.spawn(function()
 		if State.autoPressT then
 			PressT.run(State)
 		end
-
-		if State.autoMiner then
-			AutoMiner.run(State)
-		end
-
 		task.wait(0.2)
 
 	end

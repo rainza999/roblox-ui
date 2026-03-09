@@ -3,6 +3,16 @@ local State = {
 	autoPressT = false,
 	autoMiner = false,
 	autoDefend = false,
+
+	autoUseLuckPotion = false,
+	autoUseMinerPotion = false,
+
+	autoBuyLuckPotion = false,
+	autoBuyMinerPotion = false,
+
+	luckPotionEnabled = false,
+	minerPotionEnabled = false,
+
 	autoClearTrash = false,
 
 	isClearing = false,
