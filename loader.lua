@@ -21,6 +21,7 @@ local State = loadModule("State")
 local UI = loadModule("UI")
 local PressT = loadModule("PressT")
 local AutoAttackBoss = loadModule("AutoAttackBoss")
+local AutoMiner = loadModule("AutoMiner")
 
 UI.create(State)
 
@@ -33,6 +34,10 @@ task.spawn(function()
 
 		if State.autoPressT then
 			PressT.run(State)
+		end
+
+		if State.autoMiner then
+			AutoMiner.run(State)
 		end
 
 		task.wait(0.2)
