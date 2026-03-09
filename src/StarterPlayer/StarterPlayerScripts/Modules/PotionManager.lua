@@ -26,15 +26,15 @@ function PotionManager.run(State)
 	local POTIONS = {
 		LuckPotion1 = {
 			name = "LuckPotion1",
-			maxStacks = 12,       -- 60 min / 5 min
-			durationPerUse = 300, -- 5 min
-			targetStock = 10,     -- อยากให้เหลือ/เติมให้เต็ม 10
+			maxStacks = 12,
+			durationPerUse = 300,
+			targetStock = 10,
 		},
 		MinerPotion1 = {
 			name = "MinerPotion1",
-			maxStacks = 3,        -- 15 min / 5 min
-			durationPerUse = 300, -- 5 min
-			targetStock = 10,     -- อยากให้เหลือ/เติมให้เต็ม 10
+			maxStacks = 3,
+			durationPerUse = 300,
+			targetStock = 10,
 		},
 	}
 
@@ -51,23 +51,53 @@ function PotionManager.run(State)
 		},
 	}
 
-	local function findToolCount(toolName)
-		local backpack = player:FindFirstChildOfClass("Backpack")
-		if not backpack then
-			return 0
+	local function getBackpack()
+		return player:FindFirstChildOfClass("Backpack")
+	end
+
+	local function getCharacter()
+		return player.Character or player.CharacterAdded:Wait()
+	end
+
+	local function findToolInstance(toolName)
+		local backpack = getBackpack()
+		if backpack then
+			local item = backpack:FindFirstChild(toolName)
+			if item then
+				return item
+			end
 		end
 
-		local item = backpack:FindFirstChild(toolName)
+		local character = getCharacter()
+		if character then
+			local item = character:FindFirstChild(toolName)
+			if item then
+				return item
+			end
+		end
+
+		return nil
+	end
+
+	local function findToolCount(toolName)
+		local item = findToolInstance(toolName)
 		if not item then
 			return 0
 		end
 
 		local countValue = item:FindFirstChild("Count")
-		if countValue and countValue:IsA("IntValue") then
+		if countValue and (countValue:IsA("IntValue") or countValue:IsA("NumberValue")) then
 			return countValue.Value
 		end
 
-		return 0
+		-- บางเกมเก็บเป็น Attribute
+		local attr = item:GetAttribute("Count")
+		if typeof(attr) == "number" then
+			return attr
+		end
+
+		-- ถ้าเจอ item แต่ไม่มี Count อย่างน้อยให้ถือว่ามี 1
+		return 1
 	end
 
 	local function buyPotion(toolName, amount)
@@ -154,6 +184,8 @@ function PotionManager.run(State)
 		local count = findToolCount(toolName)
 		local need = cfg.targetStock - count
 
+		print("[PotionStock]", toolName, "count=", count, "need=", need)
+
 		if need <= 0 then
 			return
 		end
@@ -164,8 +196,6 @@ function PotionManager.run(State)
 
 		st.lastBuyAt = tick()
 
-		print("[PotionManager] Need buy:", toolName, need, "| current =", count, "| target =", cfg.targetStock)
-
 		local bought = buyPotion(toolName, need)
 		if bought then
 			task.wait(1)
@@ -173,29 +203,33 @@ function PotionManager.run(State)
 	end
 
 	local function ensurePotionBuff(toolName)
-        print("[PotionBuff] enter:", toolName)
+		print("[PotionBuff] enter:", toolName)
 
-        local st = potionState[toolName]
-        local count = findToolCount(toolName)
+		local st = potionState[toolName]
+		if not st then
+			warn("[PotionBuff] no potionState for", toolName)
+			return
+		end
 
-        print(
-            "[PotionBuff]",
-            toolName,
-            "count=", count,
-            "stacks=", getRemainingStacks(toolName),
-            "remain=", math.floor(getRemainingSeconds(toolName)),
-            "lastUseDiff=", tick() - st.lastUseAt
-        )
+		local count = findToolCount(toolName)
+		local stacks = getRemainingStacks(toolName)
+		local remain = math.floor(getRemainingSeconds(toolName))
+		local canUse = canUseMore(toolName)
 
-		if not canUseMore(toolName) then
+		print("[PotionBuff]", toolName, "count=", count, "stacks=", stacks, "remain=", remain, "canUse=", canUse)
+
+		if not canUse then
+			print("[PotionBuff] blocked: max stack reached", toolName)
 			return
 		end
 
 		if count <= 0 then
+			print("[PotionBuff] blocked: no potion in bag", toolName)
 			return
 		end
 
 		if tick() - st.lastUseAt < 4 then
+			print("[PotionBuff] blocked: cooldown", toolName, "diff=", tick() - st.lastUseAt)
 			return
 		end
 
@@ -204,7 +238,7 @@ function PotionManager.run(State)
 			registerUse(toolName)
 
 			print(
-				"[Potion]",
+				"[PotionBuff] used",
 				toolName,
 				"stacks=", getRemainingStacks(toolName),
 				"remain=", math.floor(getRemainingSeconds(toolName)),
@@ -212,36 +246,49 @@ function PotionManager.run(State)
 			)
 
 			task.wait(4)
+		else
+			warn("[PotionBuff] usePotion returned false:", toolName)
 		end
 	end
 
 	task.spawn(function()
+		print("[PotionManager] loop started")
+
 		while getgenv().RobloxUIRunning do
-            print(
-                "[PotionLoop]",
-                "autoUseLuck=", State.autoUseLuckPotion,
-                "autoBuyLuck=", State.autoBuyLuckPotion,
-                "autoUseMiner=", State.autoUseMinerPotion,
-                "autoBuyMiner=", State.autoBuyMinerPotion
-            )
-			if State.autoBuyLuckPotion then
-				ensurePotionStock("LuckPotion1")
-			end
+			local ok, err = pcall(function()
+				print(
+					"[PotionLoop]",
+					"autoUseLuck=", State.autoUseLuckPotion,
+					"autoBuyLuck=", State.autoBuyLuckPotion,
+					"autoUseMiner=", State.autoUseMinerPotion,
+					"autoBuyMiner=", State.autoBuyMinerPotion
+				)
 
-			if State.autoBuyMinerPotion then
-				ensurePotionStock("MinerPotion1")
-			end
+				if State.autoBuyLuckPotion then
+					ensurePotionStock("LuckPotion1")
+				end
 
-			if State.autoUseLuckPotion then
-				ensurePotionBuff("LuckPotion1")
-			end
+				if State.autoBuyMinerPotion then
+					ensurePotionStock("MinerPotion1")
+				end
 
-			if State.autoUseMinerPotion then
-				ensurePotionBuff("MinerPotion1")
+				if State.autoUseLuckPotion then
+					ensurePotionBuff("LuckPotion1")
+				end
+
+				if State.autoUseMinerPotion then
+					ensurePotionBuff("MinerPotion1")
+				end
+			end)
+
+			if not ok then
+				warn("[PotionLoop ERROR]", err)
 			end
 
 			task.wait(1)
 		end
+
+		print("[PotionManager] loop ended")
 	end)
 
 	PotionManager.buyPotion = function(toolName, amount)
