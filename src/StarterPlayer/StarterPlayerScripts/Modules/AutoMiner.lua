@@ -13,6 +13,14 @@ function AutoMiner.run(State)
 
 	local currentMode = nil
 
+    local getCharacter
+	local waitForPickaxeModel
+	local waitForWeaponModel
+
+    getCharacter = function()
+		return player.Character or player.CharacterAdded:Wait()
+	end
+
 	local function pressKey(keyCode)
 		VirtualInputManager:SendKeyEvent(true, keyCode, false, game)
 		task.wait(0.05)
@@ -64,7 +72,7 @@ function AutoMiner.run(State)
 		return character, humanoid, hrp
 	end
 
-    local function waitForPickaxeModel(timeout)
+    waitForPickaxeModel = function(timeout)
 		local character = getCharacter()
 		local deadline = tick() + (timeout or 2)
 
@@ -79,7 +87,7 @@ function AutoMiner.run(State)
 		return nil
 	end
 
-	local function waitForWeaponModel(timeout)
+	waitForWeaponModel = function(timeout)
 		local character = getCharacter()
 		local deadline = tick() + (timeout or 2)
 
