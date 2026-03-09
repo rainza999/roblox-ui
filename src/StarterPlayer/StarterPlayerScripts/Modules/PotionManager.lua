@@ -173,8 +173,19 @@ function PotionManager.run(State)
 	end
 
 	local function ensurePotionBuff(toolName)
-		local st = potionState[toolName]
-		local count = findToolCount(toolName)
+        print("[PotionBuff] enter:", toolName)
+
+        local st = potionState[toolName]
+        local count = findToolCount(toolName)
+
+        print(
+            "[PotionBuff]",
+            toolName,
+            "count=", count,
+            "stacks=", getRemainingStacks(toolName),
+            "remain=", math.floor(getRemainingSeconds(toolName)),
+            "lastUseDiff=", tick() - st.lastUseAt
+        )
 
 		if not canUseMore(toolName) then
 			return
