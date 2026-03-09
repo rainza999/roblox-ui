@@ -8,13 +8,23 @@ getgenv().RobloxUIRunning = true
 local base = "https://raw.githubusercontent.com/rainza999/roblox-ui/main/src/StarterPlayer/StarterPlayerScripts/Modules/"
 
 local function loadModule(name)
-
     local url = base .. name .. ".lua?t=" .. tostring(os.time())
+    print("Loading module:", name, url)
 
-    local src = game:HttpGet(url, true)
+    local src = game:HttpGet(url)
+    assert(src and src ~= "", "HttpGet failed for " .. name)
 
-    return loadstring(src)()
+    print("First 200 chars of " .. name .. ":")
+    print(src:sub(1, 200))
 
+    local fn, err = loadstring(src)
+    assert(fn, "loadstring failed for " .. name .. ": " .. tostring(err))
+
+    local ok, result = pcall(fn)
+    assert(ok, "runtime error in module " .. name .. ": " .. tostring(result))
+    assert(result ~= nil, "module returned nil: " .. name)
+
+    return result
 end
 
 local State = loadModule("State")
