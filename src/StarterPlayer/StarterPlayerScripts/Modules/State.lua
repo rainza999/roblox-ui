@@ -24,6 +24,7 @@ local State = {
 	},
 
 	selectedOres = {
+		["Heavenite"] = false,
 		["Gargantuan"] = false,
 		["Suryafal"] = false,
 		["Etherealite"] = false,

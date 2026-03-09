@@ -34,6 +34,7 @@ function UI.create(state)
 	}
 
 	local oreNames = {
+		"Heavenite",
 		"Gargantuan",
 		"Suryafal",
 		"Etherealite",
