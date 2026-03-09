@@ -20,20 +20,39 @@ function AutoMiner.run(State)
 		task.wait(0.1)
 	end
 
-	local function setMode(mode)
+    local function setMode(mode)
 		if currentMode == mode then
-			return
+			return true
 		end
-
-		currentMode = mode
 
 		if mode == "mining" then
 			print("[AutoMiner] Switch mode -> mining")
 			pressKey(Enum.KeyCode.One)
+
+			local ok = waitForPickaxeModel(2)
+			if ok then
+				currentMode = mode
+				return true
+			else
+				warn("[AutoMiner] PickaxeModel not found after pressing 1")
+				return false
+			end
+
 		elseif mode == "combat" then
 			print("[AutoMiner] Switch mode -> combat")
 			pressKey(Enum.KeyCode.Two)
+
+			local ok = waitForWeaponModel(2)
+			if ok then
+				currentMode = mode
+				return true
+			else
+				warn("[AutoMiner] WeaponModel not found after pressing 2")
+				return false
+			end
 		end
+
+		return false
 	end
 
 	local skippedMinerals = {}
@@ -45,8 +64,42 @@ function AutoMiner.run(State)
 		return character, humanoid, hrp
 	end
 
+    local function waitForPickaxeModel(timeout)
+		local character = getCharacter()
+		local deadline = tick() + (timeout or 2)
+
+		while tick() < deadline do
+			local pickaxeModel = character:FindFirstChild("PickaxeModel")
+			if pickaxeModel then
+				return pickaxeModel
+			end
+			task.wait(0.05)
+		end
+
+		return nil
+	end
+
+	local function waitForWeaponModel(timeout)
+		local character = getCharacter()
+		local deadline = tick() + (timeout or 2)
+
+		while tick() < deadline do
+			local weaponModel = character:FindFirstChild("WeaponModel")
+			if weaponModel then
+				return weaponModel
+			end
+			task.wait(0.05)
+		end
+
+		return nil
+	end
+
 	local function mining()
-        setMode("mining")
+		local ok = setMode("mining")
+		if not ok then
+			return
+		end
+
 		pcall(function()
 			ReplicatedStorage
 				:WaitForChild("Shared")
@@ -60,8 +113,12 @@ function AutoMiner.run(State)
 		end)
 	end
 
-    local function attack()
-        setMode("combat")
+	local function attack()
+		local ok = setMode("combat")
+		if not ok then
+			return
+		end
+
 		pcall(function()
 			ReplicatedStorage
 				:WaitForChild("Shared")
@@ -299,6 +356,38 @@ function AutoMiner.run(State)
 
         return false, nil
     end
+
+    local function shouldSkipMineralBeforeMove(mineral)
+		if not hasAnySelectedOre() then
+			return false
+		end
+
+		if not mineral or not mineral.Parent then
+			return true
+		end
+
+		local oreModels = getOreModels(mineral)
+
+		if #oreModels == 0 then
+			print("[AutoMiner] Mineral has no ore yet -> allowed:", mineral.Name)
+			return false
+		end
+
+		for _, oreModel in ipairs(oreModels) do
+			local oreName = oreModel:GetAttribute("Ore")
+			if oreName then
+				print("[AutoMiner] Mineral has ore:", mineral.Name, "->", oreName)
+			end
+
+			if oreName and State.selectedOres and State.selectedOres[oreName] then
+				print("[AutoMiner] Ore matched before move:", oreName)
+				return false
+			end
+		end
+
+		print("[AutoMiner] Skip mineral before move (wrong existing ore):", mineral.Name)
+		return true
+	end
 
 	-- =========================
 	-- MONSTER LOGIC
@@ -587,9 +676,10 @@ function AutoMiner.run(State)
 
 							for _, spawnLocation in ipairs(spawnLocations) do
 								for _, child in ipairs(spawnLocation:GetChildren()) do
-									if child.Name == targetName
+                                    if child.Name == targetName
 										and isMinerAlive(child)
-										and not isMineralSkipped(child) then
+										and not isMineralSkipped(child)
+										and not shouldSkipMineralBeforeMove(child) then
 										local part = getMinerPart(child)
 										if part then
 											local dist = (part.Position - hrp.Position).Magnitude
