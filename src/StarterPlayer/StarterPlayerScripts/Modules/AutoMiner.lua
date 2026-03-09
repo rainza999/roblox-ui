@@ -151,6 +151,31 @@ function AutoMiner.run(State)
 		}
 	end
 
+    local function getAllMineralTypes()
+		return {
+			"Floating Crystal",
+			"Large Red Crystal",
+			"Large Ice Crystal",
+			"Medium Red Crystal",
+			"Medium Ice Crystal",
+			"Small Red Crystal",
+		}
+	end
+
+	local function isTrashMineralType(mineralName)
+		if State.selectedMinerals and State.selectedMinerals[mineralName] then
+			return false
+		end
+		return true
+	end
+
+	local function getClearLimit(mineralName)
+		if State.clearLimits and type(State.clearLimits[mineralName]) == "number" then
+			return State.clearLimits[mineralName]
+		end
+		return 0
+	end
+
 	local function cleanupSkippedMinerals()
 		local now = tick()
 		for mineral, expireAt in pairs(skippedMinerals) do
@@ -344,10 +369,28 @@ function AutoMiner.run(State)
 		return true
 	end
 
+    local function faceTargetPart(targetPart)
+        local character, humanoid, hrp = getCharacterParts()
+        if not targetPart or not targetPart.Parent then
+            return false
+        end
+
+        local targetPos = targetPart.Position
+        local myPos = hrp.Position
+
+        local lookAt = Vector3.new(targetPos.X, myPos.Y, targetPos.Z)
+        if (lookAt - myPos).Magnitude < 0.05 then
+            return false
+        end
+
+        hrp.CFrame = CFrame.lookAt(myPos, lookAt)
+        return true
+    end
+
 	local function attackMonster(monster)
 		local timeout = tick() + 12
 
-		while State.autoMiner and monster and monster.Parent and tick() < timeout do
+		while getgenv().RobloxUIRunning and State.autoMiner and monster and monster.Parent and tick() < timeout do
 			if not isMonsterAlive(monster) then
 				return true
 			end
@@ -406,6 +449,83 @@ function AutoMiner.run(State)
 	-- =========================
 	-- MINERAL FINDING
 	-- =========================
+
+    local function countMineralsInLocation(locationName)
+		local locationsByMap = getSpawnLocationsByMap()
+		local spawnLocations = locationsByMap[locationName]
+		local counts = {}
+
+		for _, mineralName in ipairs(getAllMineralTypes()) do
+			counts[mineralName] = 0
+		end
+
+		if not spawnLocations then
+			return counts
+		end
+
+		for _, spawnLocation in ipairs(spawnLocations) do
+			for _, child in ipairs(spawnLocation:GetChildren()) do
+				if counts[child.Name] ~= nil and isMinerAlive(child) and not isMineralSkipped(child) then
+					counts[child.Name] += 1
+				end
+			end
+		end
+
+		return counts
+	end
+
+    local function findClearTarget()
+		if not State.autoClearTrash then
+			return nil, nil, nil
+		end
+
+		local locationsByMap = getSpawnLocationsByMap()
+		local _, _, hrp = getCharacterParts()
+
+		for _, locationName in ipairs(getLocationPriorityList()) do
+			if State.selectedLocations and State.selectedLocations[locationName] then
+				local spawnLocations = locationsByMap[locationName]
+				if spawnLocations and #spawnLocations > 0 then
+					local counts = countMineralsInLocation(locationName)
+
+					for _, mineralName in ipairs(getAllMineralTypes()) do
+						if isTrashMineralType(mineralName) then
+							local currentCount = counts[mineralName] or 0
+							local limit = getClearLimit(mineralName)
+
+							if currentCount > limit then
+								local nearestMiner = nil
+								local nearestDistance = math.huge
+
+								for _, spawnLocation in ipairs(spawnLocations) do
+									for _, child in ipairs(spawnLocation:GetChildren()) do
+										if child.Name == mineralName
+											and isMinerAlive(child)
+											and not isMineralSkipped(child) then
+											local part = getMinerPart(child)
+											if part then
+												local dist = (part.Position - hrp.Position).Magnitude
+												if dist < nearestDistance then
+													nearestDistance = dist
+													nearestMiner = child
+												end
+											end
+										end
+									end
+								end
+
+								if nearestMiner then
+									return nearestMiner, locationName, mineralName
+								end
+							end
+						end
+					end
+				end
+			end
+		end
+
+		return nil, nil, nil
+	end
 
     local function findMineral()
 		local locationsByMap = getSpawnLocationsByMap()
@@ -470,7 +590,10 @@ function AutoMiner.run(State)
 		if not targetPart then
 			return false
 		end
-		return moveToTargetPart(targetPart, 4)
+        
+        local moved = moveToTargetPart(targetPart, 4)
+        faceTargetPart(targetPart)
+        return moved
 	end
 
 	local function mineTarget(mineral)
@@ -479,7 +602,7 @@ function AutoMiner.run(State)
 		local foundOreOnce = false
 		local lastHp = getMinerHealth(mineral)
 
-		while State.autoMiner and mineral and mineral.Parent and tick() < timeout do
+		while getgenv().RobloxUIRunning and State.autoMiner and mineral and mineral.Parent and tick() < timeout do
 			-- ถ้ามีมอนเข้ามาใกล้ ให้ไปจัดมอนก่อน แล้วค่อยกลับมา
 			handleNearbyMonster()
 
@@ -501,6 +624,8 @@ function AutoMiner.run(State)
 				if not targetPart then
 					return true
 				end
+            else
+                faceTargetPart(targetPart)
 			end
 
 			if oreMode then
@@ -516,6 +641,7 @@ function AutoMiner.run(State)
 				end
 			end
 
+            faceTargetPart(targetPart)
 			mining()
 			task.wait(0.15)
 
@@ -549,7 +675,62 @@ function AutoMiner.run(State)
 		return false
 	end
 
-	while true do
+    local function clearTrashMineral(mineral, locationName, mineralName)
+		if not mineral then
+			return false
+		end
+
+		State.isClearing = true
+		State.clearStatusText = string.format("Clearing %s @ %s", mineralName or mineral.Name, locationName or "?")
+
+		print("[AutoMiner] Clear target:", mineralName or mineral.Name, "| Location:", locationName)
+
+		moveToMiner(mineral)
+
+		local timeout = tick() + 20
+		while getgenv().RobloxUIRunning and State.autoClearTrash and mineral and mineral.Parent and tick() < timeout do
+			handleNearbyMonster()
+
+			if not isMinerAlive(mineral) then
+				print("[AutoMiner] Clear finished:", mineralName or mineral.Name)
+				State.isClearing = false
+				State.clearStatusText = ""
+				return true
+			end
+
+			local targetPart = getMinerPart(mineral)
+			if not targetPart then
+				State.isClearing = false
+				State.clearStatusText = ""
+				return true
+			end
+
+			local _, _, hrp = getCharacterParts()
+			local dist = (targetPart.Position - hrp.Position).Magnitude
+
+			if dist > 12 then
+				moveToMiner(mineral)
+				targetPart = getMinerPart(mineral)
+				if not targetPart then
+					State.isClearing = false
+					State.clearStatusText = ""
+					return true
+				end
+			else
+				faceTargetPart(targetPart)
+			end
+
+			faceTargetPart(targetPart)
+			mining()
+			task.wait(0.15)
+		end
+
+		State.isClearing = false
+		State.clearStatusText = ""
+		return false
+	end
+
+	while getgenv().RobloxUIRunning do
 		if not State.autoMiner then
 			task.wait(0.2)
 			continue
@@ -560,6 +741,13 @@ function AutoMiner.run(State)
 		-- ก่อนหาแร่ใหม่ เช็คมอนรอบตัวก่อน
 		if handleNearbyMonster() then
 			task.wait(0.1)
+		end
+
+        local clearMineral, clearLocationName, clearMineralName = findClearTarget()
+		if clearMineral then
+			clearTrashMineral(clearMineral, clearLocationName, clearMineralName)
+			task.wait(0.1)
+			continue
 		end
 
 		local mineral, locationName = findMineral()

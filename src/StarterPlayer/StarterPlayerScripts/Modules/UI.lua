@@ -84,7 +84,7 @@ function UI.create(state)
 		return s
 	end
 
-	local expandedHeight = 760
+	local expandedHeight = 820
 	local collapsedHeight = 48
 	local isCollapsed = false
 
@@ -140,6 +140,17 @@ function UI.create(state)
 
 	closeBtn.MouseButton1Click:Connect(function()
 		getgenv().RobloxUIRunning = false
+
+		state.autoBoss = false
+		state.autoMiner = false
+		state.autoPressT = false
+		state.autoDefend = false
+		state.autoClearTrash = false
+		state.isClearing = false
+		state.clearStatusText = "Stopped"
+
+		refreshButtons()
+
 		screenGui:Destroy()
 	end)
 
@@ -508,11 +519,12 @@ function UI.create(state)
 	local tBtn = makeButton("Auto T: OFF", 60)
 	local minerBtn = makeButton("Auto Miner: OFF", 110)
 	local defendBtn = makeButton("Auto Defend: OFF", 160)
+	local clearBtn = makeButton("Auto Clear Trash: OFF", 210)
 
 	local locationSelect = createMultiSelect(
 		locationNames,
 		state.selectedLocations,
-		215,
+		265,
 		"Select locations...",
 		190
 	)
@@ -520,7 +532,7 @@ function UI.create(state)
 	local mineralSelect = createMultiSelect(
 		mineralNames,
 		state.selectedMinerals,
-		270,
+		320,
 		"Select minerals...",
 		190
 	)
@@ -528,18 +540,26 @@ function UI.create(state)
 	local oreSelect = createMultiSelect(
 		oreNames,
 		state.selectedOres,
-		325,
+		375,
 		"Select ores...",
 		190
 	)
 
 	local function refreshButtons()
+		local minerText = state.autoMiner and "ON" or "OFF"
+		local defendText = state.autoDefend and "ON" or "OFF"
+
+		if state.isClearing then
+			minerText = "WAIT"
+			defendText = "WAIT"
+		end
+
 		bossBtn.Text = "Auto Boss: " .. (state.autoBoss and "ON" or "OFF")
 		bossBtn.BackgroundColor3 = state.autoBoss
 			and Color3.fromRGB(40, 140, 70)
 			or Color3.fromRGB(60, 60, 60)
 
-		minerBtn.Text = "Auto Miner: " .. (state.autoMiner and "ON" or "OFF")
+		minerBtn.Text = "Auto Miner: " .. minerText
 		minerBtn.BackgroundColor3 = state.autoMiner
 			and Color3.fromRGB(40, 140, 70)
 			or Color3.fromRGB(60, 60, 60)
@@ -549,10 +569,33 @@ function UI.create(state)
 			and Color3.fromRGB(40, 140, 70)
 			or Color3.fromRGB(60, 60, 60)
 
-		defendBtn.Text = "Auto Defend: " .. (state.autoDefend and "ON" or "OFF")
+		defendBtn.Text = "Auto Defend: " .. defendText
 		defendBtn.BackgroundColor3 = state.autoDefend
 			and Color3.fromRGB(40, 140, 70)
-			or Color3.fromRGB(60, 60, 60)	
+			or Color3.fromRGB(60, 60, 60)
+
+		clearBtn.Text = "Auto Clear Trash: " .. (state.autoClearTrash and "ON" or "OFF")
+		clearBtn.BackgroundColor3 = state.autoClearTrash
+			and Color3.fromRGB(40, 140, 70)
+			or Color3.fromRGB(60, 60, 60)
+
+		-- if state.isClearing then
+		-- 	statusLabel.Text = "Status: " .. (state.clearStatusText ~= "" and state.clearStatusText or "Clearing...")
+		-- 	statusLabel.TextColor3 = Color3.fromRGB(255, 210, 120)
+		-- else
+		-- 	statusLabel.Text = "Status: Idle"
+		-- 	statusLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+		-- end
+
+		if statusLabel then
+			if state.isClearing then
+				statusLabel.Text = "Status: " .. (state.clearStatusText ~= "" and state.clearStatusText or "Clearing...")
+				statusLabel.TextColor3 = Color3.fromRGB(255, 210, 120)
+			else
+				statusLabel.Text = "Status: Idle"
+				statusLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+			end
+		end
 	end
 
 	bossBtn.MouseButton1Click:Connect(function()
@@ -575,10 +618,27 @@ function UI.create(state)
 		refreshButtons()
 	end)
 
+	clearBtn.MouseButton1Click:Connect(function()
+		state.autoClearTrash = not state.autoClearTrash
+		refreshButtons()
+	end)
+
 	local dragToggle = nil
 	local dragInput = nil
 	local dragStart = nil
 	local startPos = nil
+
+	local statusLabel = Instance.new("TextLabel")
+	statusLabel.Size = UDim2.new(1, -20, 0, 24)
+	statusLabel.Position = UDim2.new(0, 10, 0, 255)
+	statusLabel.BackgroundTransparency = 1
+	statusLabel.Font = Enum.Font.Gotham
+	statusLabel.TextSize = 13
+	statusLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+	statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+	statusLabel.Text = "Status: Idle"
+	statusLabel.Parent = content
+
 
 	local function updateDrag(input)
 		local delta = input.Position - dragStart
@@ -622,6 +682,7 @@ function UI.create(state)
 		isCollapsed = collapsed
 
 		if collapsed then
+			locationSelect.close()
 			mineralSelect.close()
 			oreSelect.close()
 			content.Visible = false
@@ -652,6 +713,13 @@ function UI.create(state)
 
 	refreshButtons()
 	setCollapsed(false)
+
+	task.spawn(function()
+		while getgenv().RobloxUIRunning and screenGui.Parent do
+			refreshButtons()
+			task.wait(0.2)
+		end
+	end)
 
 	return screenGui
 end

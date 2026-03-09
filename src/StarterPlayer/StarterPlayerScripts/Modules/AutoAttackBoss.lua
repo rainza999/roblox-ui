@@ -33,7 +33,7 @@ function AutoAttackBoss.run(State)
 		local start = tick()
 		timeout = timeout or 30
 
-		while tick() - start < timeout do
+		while getgenv().RobloxUIRunning and tick() - start < timeout do
 			if State and not State.autoBoss then
 				return nil
 			end
@@ -70,7 +70,7 @@ function AutoAttackBoss.run(State)
 	local function followBoss(bossModel)
 		local _, humanoid, hrp = getCharacterParts()
 
-		while bossModel and bossModel.Parent do
+		while getgenv().RobloxUIRunning and bossModel and bossModel.Parent do
 			if State and not State.autoBoss then
 				return false
 			end
@@ -114,7 +114,7 @@ function AutoAttackBoss.run(State)
 	end
 
 	local function waitUntil(ts)
-		while os.time() < ts do
+		while getgenv().RobloxUIRunning and os.time() < ts do
 			if State and not State.autoBoss then
 				return
 			end
@@ -136,7 +136,7 @@ function AutoAttackBoss.run(State)
 		end
 	end
 
-	while true do
+	while getgenv().RobloxUIRunning do
 		if not State.autoBoss then
 			task.wait(0.2)
 			continue
