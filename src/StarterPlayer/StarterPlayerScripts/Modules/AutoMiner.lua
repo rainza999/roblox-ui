@@ -20,14 +20,13 @@ function AutoMiner.run(State)
 		pcall(function()
 			ReplicatedStorage
 				:WaitForChild("Shared")
-                :WaitForChild("Packages")
-                :WaitForChild("Knit")
-                :WaitForChild("Services")
-                :WaitForChild("ToolService")
-                :WaitForChild("RF")
-                :WaitForChild("ToolActivated")
-                :InvokeServer("Pickaxe")
-
+				:WaitForChild("Packages")
+				:WaitForChild("Knit")
+				:WaitForChild("Services")
+				:WaitForChild("ToolService")
+				:WaitForChild("RF")
+				:WaitForChild("ToolActivated")
+				:InvokeServer("Pickaxe")
 		end)
 	end
 
@@ -68,66 +67,104 @@ function AutoMiner.run(State)
 		return nil
 	end
 
+	local function getMinerHealth(mineral)
+		if not mineral or not mineral.Parent then
+			return nil
+		end
+
+		-- 1) เช็คจาก Attribute ก่อน
+		local attrHealth = mineral:GetAttribute("Health")
+		if type(attrHealth) == "number" then
+			return attrHealth
+		end
+
+		-- 2) เช็คจากลูกชื่อ Health
+		local hp = mineral:FindFirstChild("Health")
+		if hp then
+			if hp:IsA("NumberValue") or hp:IsA("IntValue") then
+				return hp.Value
+			end
+		end
+
+		-- 3) บางเกมใส่ไว้ในลูกลึกลงไป
+		for _, obj in ipairs(mineral:GetDescendants()) do
+			if obj.Name == "Health" then
+				if obj:IsA("NumberValue") or obj:IsA("IntValue") then
+					return obj.Value
+				end
+			end
+		end
+
+		return nil
+	end
+
 	local function isMinerAlive(mineral)
 		if not mineral or not mineral.Parent then
 			return false
 		end
 
-		-- เผื่อบางเกมใช้ Attribute / BoolValue / Health ของตัวเอง
-		local hp = mineral:FindFirstChild("Health")
-		if hp and hp:IsA("NumberValue") then
-			return hp.Value > 0
+		local part = getMinerPart(mineral)
+		if not part or not part.Parent then
+			return false
 		end
 
+		local hp = getMinerHealth(mineral)
+		if hp ~= nil then
+			return hp > 0
+		end
+
+		-- ถ้าไม่มี Health ให้ถือว่ายังอยู่ ถ้า model ยังไม่หาย
 		return true
 	end
 
+	local function getPriorityList()
+		return {
+			"Floating Crystal",
+			"Large Red Crystal",
+			"Large Ice Crystal",
+			"Medium Red Crystal",
+			"Medium Ice Crystal",
+			"Small Red Crystal",
+		}
+	end
+
 	local function findMineral()
-        local spawnLocations = getAllSpawnLocations()
-        if #spawnLocations == 0 then
-            warn("No SpawnLocation found under workspace.Rocks")
-            return nil
-        end
+		local spawnLocations = getAllSpawnLocations()
+		if #spawnLocations == 0 then
+			warn("No SpawnLocation found under workspace.Rocks")
+			return nil
+		end
 
-        local _, _, hrp = getCharacterParts()
+		local _, _, hrp = getCharacterParts()
 
-        local priorityList = {
-            "Floating Crystal",
-            "Large Red Crystal",
-            "Large Ice Crystal",
-            "Medium Red Crystal",
-            "Medium Ice Crystal",
-            "Small Red Crystal",
-        }
+		for _, targetName in ipairs(getPriorityList()) do
+			if State.selectedMinerals and State.selectedMinerals[targetName] then
+				local nearestMiner = nil
+				local nearestDistance = math.huge
 
-        for _, targetName in ipairs(priorityList) do
-            if State.selectedMinerals and State.selectedMinerals[targetName] then
-                local nearestMiner = nil
-                local nearestDistance = math.huge
+				for _, spawnLocation in ipairs(spawnLocations) do
+					for _, child in ipairs(spawnLocation:GetChildren()) do
+						if child.Name == targetName and isMinerAlive(child) then
+							local part = getMinerPart(child)
+							if part then
+								local dist = (part.Position - hrp.Position).Magnitude
+								if dist < nearestDistance then
+									nearestDistance = dist
+									nearestMiner = child
+								end
+							end
+						end
+					end
+				end
 
-                for _, spawnLocation in ipairs(spawnLocations) do
-                    for _, child in ipairs(spawnLocation:GetChildren()) do
-                        if child.Name == targetName and isMinerAlive(child) then
-                            local part = getMinerPart(child)
-                            if part then
-                                local dist = (part.Position - hrp.Position).Magnitude
-                                if dist < nearestDistance then
-                                    nearestDistance = dist
-                                    nearestMiner = child
-                                end
-                            end
-                        end
-                    end
-                end
+				if nearestMiner then
+					return nearestMiner
+				end
+			end
+		end
 
-                if nearestMiner then
-                    return nearestMiner
-                end
-            end
-        end
-
-        return nil
-    end
+		return nil
+	end
 
 	local function moveToMiner(mineral)
 		local _, _, hrp = getCharacterParts()
@@ -139,6 +176,7 @@ function AutoMiner.run(State)
 
 		local targetCF = targetPart.CFrame * CFrame.new(0, 0, 4)
 		local dist = (targetCF.Position - hrp.Position).Magnitude
+
 		local tween = TweenService:Create(
 			hrp,
 			TweenInfo.new(math.max(dist / 60, 0.05)),
@@ -153,27 +191,55 @@ function AutoMiner.run(State)
 
 	local function mineTarget(mineral)
 		local timeout = tick() + 20
+		local lastHp = getMinerHealth(mineral)
 
 		while State.autoMiner and mineral and mineral.Parent and tick() < timeout do
+			if not isMinerAlive(mineral) then
+				return true
+			end
+
 			local _, _, hrp = getCharacterParts()
 			local targetPart = getMinerPart(mineral)
 
 			if not targetPart then
-				break
+				return true
 			end
 
 			local dist = (targetPart.Position - hrp.Position).Magnitude
 			if dist > 12 then
 				moveToMiner(mineral)
+				targetPart = getMinerPart(mineral)
+				if not targetPart then
+					return true
+				end
 			end
 
 			mining()
 			task.wait(0.15)
 
+			local currentHp = getMinerHealth(mineral)
+
+			-- ถ้า hp มีค่าและลดจน <= 0 ให้จบเลย
+			if currentHp ~= nil and currentHp <= 0 then
+				return true
+			end
+
+			-- ถ้า hp จากเดิมมี แต่ตอนนี้ไม่มีแล้ว และ target เปลี่ยน/หาย ให้ถือว่าแตกแล้ว
+			if lastHp ~= nil and currentHp == nil then
+				local newPart = getMinerPart(mineral)
+				if not newPart or not newPart.Parent then
+					return true
+				end
+			end
+
+			lastHp = currentHp
+
 			if not isMinerAlive(mineral) then
-				break
+				return true
 			end
 		end
+
+		return false
 	end
 
 	while true do
@@ -182,25 +248,18 @@ function AutoMiner.run(State)
 			continue
 		end
 
-        for _, mineralName in ipairs({
-            
-            "Large Red Crystal",
-            "Large Ice Crystal",
-            "Medium Red Crystal",
-            "Medium Ice Crystal",
-            "Small Red Crystal",
-        }) do
-            if State.selectedMinerals and State.selectedMinerals[mineralName] then
-                print("selected:", mineralName)
-            end
-        end
-        
 		local mineral = findMineral()
 
 		if mineral then
 			print("Found mineral:", mineral.Name)
 			moveToMiner(mineral)
-			mineTarget(mineral)
+			local finished = mineTarget(mineral)
+
+			if finished then
+				task.wait(0.2)
+			else
+				task.wait(0.1)
+			end
 		else
 			warn("No selected mineral found")
 			task.wait(0.5)
