@@ -7,13 +7,13 @@ function UI.create(state)
 	local player = Players.LocalPlayer
 	local playerGui = player:WaitForChild("PlayerGui")
 
-	local oldGui = playerGui:FindFirstChild("ControlPanel V.2.4")
+	local oldGui = playerGui:FindFirstChild("ControlPanel V.2.5")
 	if oldGui then
 		oldGui:Destroy()
 	end
 
 	local screenGui = Instance.new("ScreenGui")
-	screenGui.Name = "ControlPanel V.2.4"
+	screenGui.Name = "ControlPanel V.2.5"
 	screenGui.ResetOnSpawn = false
 	screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	screenGui.Parent = playerGui
