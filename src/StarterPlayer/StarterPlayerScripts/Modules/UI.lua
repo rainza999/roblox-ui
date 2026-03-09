@@ -138,6 +138,9 @@ function UI.create(state)
 	closeBtn.Parent = header
 	makeCorner(closeBtn, 8)
 
+	local refreshButtons
+	local statusLabel
+
 	closeBtn.MouseButton1Click:Connect(function()
 		getgenv().RobloxUIRunning = false
 
@@ -545,7 +548,8 @@ function UI.create(state)
 		190
 	)
 
-	local function refreshButtons()
+	-- local function refreshButtons()
+	refreshButtons = function()
 		local minerText = state.autoMiner and "ON" or "OFF"
 		local defendText = state.autoDefend and "ON" or "OFF"
 
@@ -628,7 +632,7 @@ function UI.create(state)
 	local dragStart = nil
 	local startPos = nil
 
-	local statusLabel = Instance.new("TextLabel")
+	statusLabel = Instance.new("TextLabel")
 	statusLabel.Size = UDim2.new(1, -20, 0, 24)
 	statusLabel.Position = UDim2.new(0, 10, 0, 255)
 	statusLabel.BackgroundTransparency = 1
