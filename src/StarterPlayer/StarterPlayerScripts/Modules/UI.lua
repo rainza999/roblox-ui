@@ -149,6 +149,7 @@ function UI.create(state)
 		state.autoMiner = false
 		state.autoPressT = false
 		state.autoDefend = false
+		state.autoMonsterFarm = false
 		state.autoClearTrash = false
 		state.isClearing = false
 		state.clearStatusText = "Stopped"
@@ -528,11 +529,11 @@ function UI.create(state)
 	local minerBtn = makeButton("Auto Miner: OFF", 110)
 	local defendBtn = makeButton("Auto Defend: OFF", 160)
 	local clearBtn = makeButton("Auto Clear Trash: OFF", 210)
-
+	local monsterFarmBtn = makeButton("Auto Monster Farm: OFF", 260)
 	local locationSelect = createMultiSelect(
 		locationNames,
 		state.selectedLocations,
-		265,
+		315,
 		"Select locations...",
 		190
 	)
@@ -540,7 +541,7 @@ function UI.create(state)
 	local mineralSelect = createMultiSelect(
 		mineralNames,
 		state.selectedMinerals,
-		320,
+		370,
 		"Select minerals...",
 		190
 	)
@@ -548,21 +549,22 @@ function UI.create(state)
 	local oreSelect = createMultiSelect(
 		oreNames,
 		state.selectedOres,
-		375,
+		425,
 		"Select ores...",
 		190
 	)
 
-	local luckAutoBtn = makeButton("Auto Luck Potion: OFF", 430)
-	local luckBuyBtn = makeButton("Auto Buy Luck: OFF", 480)
+	local luckAutoBtn = makeButton("Auto Luck Potion: OFF", 480)
+	local luckBuyBtn = makeButton("Auto Buy Luck: OFF", 530)
 
-	local minerPotionBtn = makeButton("Auto Miner Potion: OFF", 530)
-	local minerBuyBtn = makeButton("Auto Buy Miner: OFF", 580)
+	local minerPotionBtn = makeButton("Auto Miner Potion: OFF", 580)
+	local minerBuyBtn = makeButton("Auto Buy Miner: OFF", 630)
 
 	-- local function refreshButtons()
 	refreshButtons = function()
 		local minerText = state.autoMiner and "ON" or "OFF"
 		local defendText = state.autoDefend and "ON" or "OFF"
+		local monsterFarmText = state.autoMonsterFarm and "ON" or "OFF"
 
 		if state.isClearing then
 			minerText = "WAIT"
@@ -591,6 +593,11 @@ function UI.create(state)
 
 		clearBtn.Text = "Auto Clear Trash: " .. (state.autoClearTrash and "ON" or "OFF")
 		clearBtn.BackgroundColor3 = state.autoClearTrash
+			and Color3.fromRGB(40, 140, 70)
+			or Color3.fromRGB(60, 60, 60)
+
+		monsterFarmBtn.Text = "Auto Monster Farm: " .. monsterFarmText
+		monsterFarmBtn.BackgroundColor3 = state.autoMonsterFarm
 			and Color3.fromRGB(40, 140, 70)
 			or Color3.fromRGB(60, 60, 60)
 
@@ -632,6 +639,9 @@ function UI.create(state)
 
 	minerBtn.MouseButton1Click:Connect(function()
 		state.autoMiner = not state.autoMiner
+		if state.autoMiner then
+			state.autoMonsterFarm = false
+		end
 		refreshButtons()
 	end)
 
@@ -647,6 +657,14 @@ function UI.create(state)
 
 	clearBtn.MouseButton1Click:Connect(function()
 		state.autoClearTrash = not state.autoClearTrash
+		refreshButtons()
+	end)
+
+	monsterFarmBtn.MouseButton1Click:Connect(function()
+		state.autoMonsterFarm = not state.autoMonsterFarm
+		if state.autoMonsterFarm then
+			state.autoMiner = false
+		end
 		refreshButtons()
 	end)
 
@@ -677,7 +695,7 @@ function UI.create(state)
 
 	statusLabel = Instance.new("TextLabel")
 	statusLabel.Size = UDim2.new(1, -20, 0, 24)
-	statusLabel.Position = UDim2.new(0, 10, 0, 255)
+	statusLabel.Position = UDim2.new(0, 10, 0, 285)
 	statusLabel.BackgroundTransparency = 1
 	statusLabel.Font = Enum.Font.Gotham
 	statusLabel.TextSize = 13

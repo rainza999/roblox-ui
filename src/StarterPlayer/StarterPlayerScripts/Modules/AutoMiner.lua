@@ -1,3 +1,4 @@
+local ControllerLock = getgenv().RobloxModules.ControllerLock
 local AutoMiner = {}
 
 function AutoMiner.run(State)
@@ -120,7 +121,7 @@ function AutoMiner.run(State)
 	end
 
     local function isPausedForAutoMiner()
-        return State.pauseOwner ~= nil and State.pauseOwner ~= "AutoMiner"
+        return ControllerLock.isOwnedByOther(State, "AutoMiner")
     end
 
 	local function mining()
@@ -931,6 +932,11 @@ function AutoMiner.run(State)
 			continue
 		end
 
+        if not ControllerLock.tryAcquire(State, "AutoMiner", "mining") then
+			task.wait(0.1)
+			continue
+		end
+
 		cleanupSkippedMinerals()
 
 		-- ก่อนหาแร่ใหม่ เช็คมอนรอบตัวก่อน
@@ -941,6 +947,7 @@ function AutoMiner.run(State)
         local clearMineral, clearLocationName, clearMineralName = findClearTarget()
 		if clearMineral then
 			clearTrashMineral(clearMineral, clearLocationName, clearMineralName)
+            ControllerLock.release(State, "AutoMiner")
 			task.wait(0.1)
 			continue
 		end
@@ -953,6 +960,8 @@ function AutoMiner.run(State)
 			moveToMiner(mineral)
 
 			local finished = mineTarget(mineral)
+
+            ControllerLock.release(State, "AutoMiner")
 
             if isPausedForAutoMiner() then
                 task.wait(0.1)

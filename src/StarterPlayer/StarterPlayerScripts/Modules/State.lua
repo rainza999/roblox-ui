@@ -13,6 +13,8 @@ local State = {
 	luckPotionEnabled = false,
 	minerPotionEnabled = false,
 
+	autoMonsterFarm = false,
+
 	autoClearTrash = false,
 
 	isClearing = false,
@@ -49,9 +51,23 @@ local State = {
 		["Medium Red Crystal"] = 0,
 		["Medium Ice Crystal"] = 0,
 		["Small Red Crystal"] = 0,
-	}
+	},
 
+	selectedMonsters = {
+		["Yeti"] = true,
+		["Common Orc"] = true,
+		["Elite Orc"] = true,
+	},
 
+	monsterPriority = {
+		"Elite Orc",
+		"Yeti",
+		"Common Orc",
+	},
+
+	-- ตัวกลางคุมสิทธิ์
+	activeController = nil,   -- nil / "AutoMiner" / "AutoMonster"
+	activeReason = nil,       -- "mining" / "clearing" / "monster"
 }
 
 return State
