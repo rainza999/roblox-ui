@@ -7,17 +7,23 @@ function UI.create(state)
 	local player = Players.LocalPlayer
 	local playerGui = player:WaitForChild("PlayerGui")
 
-	local oldGui = playerGui:FindFirstChild("ControlPanel V.2.5")
+	local oldGui = playerGui:FindFirstChild("ControlPanel V.3")
 	if oldGui then
 		oldGui:Destroy()
 	end
 
 	local screenGui = Instance.new("ScreenGui")
-	screenGui.Name = "ControlPanel V.2.5"
+	screenGui.Name = "ControlPanel V.3"
 	screenGui.ResetOnSpawn = false
 	screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	screenGui.Parent = playerGui
 
+	local locationNames = {
+		"Island3CavePeakBarrier",
+		"Island3CavePeakEnd",
+		"Island3RedCave",
+	}
+	
 	local mineralNames = {
 		"Floating Crystal",
 		"Large Red Crystal",
@@ -34,6 +40,13 @@ function UI.create(state)
 		"Iceite",
 		"Velchire",
 	}
+
+	state.selectedLocations = state.selectedLocations or {}
+	for _, name in ipairs(locationNames) do
+		if state.selectedLocations[name] == nil then
+			state.selectedLocations[name] = false
+		end
+	end
 
 	state.selectedMinerals = state.selectedMinerals or {}
 	for _, name in ipairs(mineralNames) do
@@ -71,7 +84,7 @@ function UI.create(state)
 		return s
 	end
 
-	local expandedHeight = 620
+	local expandedHeight = 760
 	local collapsedHeight = 48
 	local isCollapsed = false
 
@@ -94,7 +107,7 @@ function UI.create(state)
 	title.Size = UDim2.new(1, -90, 1, 0)
 	title.Position = UDim2.new(0, 12, 0, 0)
 	title.BackgroundTransparency = 1
-	title.Text = "Control Panel V.2.4"
+	title.Text = "Control Panel V.3"
 	title.Font = Enum.Font.GothamBold
 	title.TextColor3 = Color3.new(1, 1, 1)
 	title.TextSize = 18
@@ -496,11 +509,18 @@ function UI.create(state)
 	local minerBtn = makeButton("Auto Miner: OFF", 110)
 	local defendBtn = makeButton("Auto Defend: OFF", 160)
 
+	local locationSelect = createMultiSelect(
+		locationNames,
+		state.selectedLocations,
+		215,
+		"Select locations...",
+		190
+	)
 
 	local mineralSelect = createMultiSelect(
 		mineralNames,
 		state.selectedMinerals,
-		215,
+		270,
 		"Select minerals...",
 		190
 	)
@@ -508,7 +528,7 @@ function UI.create(state)
 	local oreSelect = createMultiSelect(
 		oreNames,
 		state.selectedOres,
-		270,
+		325,
 		"Select ores...",
 		190
 	)

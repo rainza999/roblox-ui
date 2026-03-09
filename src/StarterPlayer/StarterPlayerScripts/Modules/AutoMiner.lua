@@ -47,7 +47,7 @@ function AutoMiner.run(State)
 	end
 
 
-	local function getAllSpawnLocations()
+    local function getSpawnLocationsByMap()
 		local results = {}
 
 		local rocks = workspace:FindFirstChild("Rocks")
@@ -56,10 +56,16 @@ function AutoMiner.run(State)
 		end
 
 		for _, mapFolder in ipairs(rocks:GetChildren()) do
-			for _, obj in ipairs(mapFolder:GetDescendants()) do
-				if obj.Name == "SpawnLocation" then
-					table.insert(results, obj)
+			if mapFolder:IsA("Folder") or mapFolder:IsA("Model") then
+				local spawnLocations = {}
+
+				for _, obj in ipairs(mapFolder:GetDescendants()) do
+					if obj.Name == "SpawnLocation" then
+						table.insert(spawnLocations, obj)
+					end
 				end
+
+				results[mapFolder.Name] = spawnLocations
 			end
 		end
 
@@ -124,6 +130,14 @@ function AutoMiner.run(State)
 		end
 
 		return true
+	end
+
+    local function getLocationPriorityList()
+		return {
+			"Island3CavePeakEnd",
+			"Island3CavePeakBarrier",
+			"Island3RedCave",
+		}
 	end
 
 	local function getPriorityList()
@@ -384,44 +398,62 @@ function AutoMiner.run(State)
 	-- MINERAL FINDING
 	-- =========================
 
-	local function findMineral()
-		local spawnLocations = getAllSpawnLocations()
-		if #spawnLocations == 0 then
-			warn("No SpawnLocation found under workspace.Rocks")
-			return nil
-		end
-
+    local function findMineral()
+		local locationsByMap = getSpawnLocationsByMap()
 		local _, _, hrp = getCharacterParts()
 
-		for _, targetName in ipairs(getPriorityList()) do
-			if State.selectedMinerals and State.selectedMinerals[targetName] then
-				local nearestMiner = nil
-				local nearestDistance = math.huge
-
-				for _, spawnLocation in ipairs(spawnLocations) do
-					for _, child in ipairs(spawnLocation:GetChildren()) do
-						if child.Name == targetName
-							and isMinerAlive(child)
-							and not isMineralSkipped(child) then
-							local part = getMinerPart(child)
-							if part then
-								local dist = (part.Position - hrp.Position).Magnitude
-								if dist < nearestDistance then
-									nearestDistance = dist
-									nearestMiner = child
-								end
-							end
-						end
-					end
-				end
-
-				if nearestMiner then
-					return nearestMiner
+		local hasAnySelectedLocation = false
+		if State.selectedLocations then
+			for _, selected in pairs(State.selectedLocations) do
+				if selected then
+					hasAnySelectedLocation = true
+					break
 				end
 			end
 		end
 
-		return nil
+		if not hasAnySelectedLocation then
+			warn("No selected location")
+			return nil
+		end
+
+		for _, locationName in ipairs(getLocationPriorityList()) do
+			if State.selectedLocations and State.selectedLocations[locationName] then
+				local spawnLocations = locationsByMap[locationName]
+
+				if spawnLocations and #spawnLocations > 0 then
+					for _, targetName in ipairs(getPriorityList()) do
+						if State.selectedMinerals and State.selectedMinerals[targetName] then
+							local nearestMiner = nil
+							local nearestDistance = math.huge
+
+							for _, spawnLocation in ipairs(spawnLocations) do
+								for _, child in ipairs(spawnLocation:GetChildren()) do
+									if child.Name == targetName
+										and isMinerAlive(child)
+										and not isMineralSkipped(child) then
+										local part = getMinerPart(child)
+										if part then
+											local dist = (part.Position - hrp.Position).Magnitude
+											if dist < nearestDistance then
+												nearestDistance = dist
+												nearestMiner = child
+											end
+										end
+									end
+								end
+							end
+
+							if nearestMiner then
+								return nearestMiner, locationName
+							end
+						end
+					end
+				end
+			end
+		end
+
+		return nil, nil
 	end
 
 	local function moveToMiner(mineral)
@@ -521,10 +553,10 @@ function AutoMiner.run(State)
 			task.wait(0.1)
 		end
 
-		local mineral = findMineral()
+		local mineral, locationName = findMineral()
 
 		if mineral then
-			print("Found mineral:", mineral.Name)
+			print("Found mineral:", mineral.Name, "at", locationName)
 			moveToMiner(mineral)
 
 			local finished = mineTarget(mineral)

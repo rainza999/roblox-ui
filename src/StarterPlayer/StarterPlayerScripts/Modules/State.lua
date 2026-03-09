@@ -4,6 +4,12 @@ local State = {
 	autoMiner = false,
 	autoDefend = false,
 
+	selectedLocations = {
+		["Island3CavePeakBarrier"] = false,
+		["Island3CavePeakEnd"] = true,
+		["Island3RedCave"] = false,
+	},
+	
 	selectedMinerals = {
 		["Floating Crystal"] = true,
 		["Large Red Crystal"] = true,
@@ -20,6 +26,8 @@ local State = {
 		["Iceite"] = false,
 		["Velchire"] = false,
 	}
+
+
 }
 
 return State
