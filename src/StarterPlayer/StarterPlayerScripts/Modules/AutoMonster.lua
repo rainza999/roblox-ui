@@ -41,13 +41,66 @@ function AutoMonster.run(State)
 		return false
 	end
 
-	local function isSelectedMonster(name)
-		return State.selectedMonsters and State.selectedMonsters[name] == true
+	local function findMonsterRoot(model)
+		return model:FindFirstChild("HumanoidRootPart", true)
+			or model:FindFirstChild("RootPart", true)
+			or model:FindFirstChild("Torso", true)
+			or model:FindFirstChild("UpperTorso", true)
+			or model.PrimaryPart
+	end
+
+	local function getRealMonsterName(model)
+		-- ลองหา StringValue/Configuration ที่เก็บชื่อจริง
+		for _, obj in ipairs(model:GetDescendants()) do
+			if obj:IsA("StringValue") then
+				local n = string.lower(obj.Name)
+				if n == "name" or n == "mobname" or n == "monstername" then
+					if obj.Value and obj.Value ~= "" then
+						return obj.Value
+					end
+				end
+			end
+		end
+
+		-- ลองหา model ลูกที่ชื่อเป็นชื่อมอนจริง
+		for _, child in ipairs(model:GetChildren()) do
+			if child:IsA("Model") then
+				local hum = child:FindFirstChildOfClass("Humanoid")
+				if hum then
+					return child.Name
+				end
+			end
+		end
+
+		-- fallback: ตัดเลขท้ายชื่อออก เช่น Common Orc17 -> Common Orc
+		local cleaned = model.Name:gsub("%d+$", "")
+		cleaned = cleaned:gsub("%s+$", "")
+		return cleaned
+	end
+
+	local function isSelectedMonster(realName)
+		if not State.selectedMonsters then
+			return false
+		end
+
+		for monsterName, selected in pairs(State.selectedMonsters) do
+			if selected and string.lower(monsterName) == string.lower(realName) then
+				return true
+			end
+		end
+
+		return false
+	end
+
+	local function findMonsterHumanoid(model)
+		return model:FindFirstChildOfClass("Humanoid")
+			or model:FindFirstChildWhichIsA("Humanoid", true)
 	end
 
 	local function findTargetMonster()
 		local living = workspace:FindFirstChild("Living")
 		if not living then
+			warn("AutoMonster: Living folder not found")
 			return nil
 		end
 
@@ -56,18 +109,27 @@ function AutoMonster.run(State)
 		local nearestDistance = math.huge
 
 		for _, model in ipairs(living:GetChildren()) do
-			if model:IsA("Model") and isSelectedMonster(model.Name) then
-				local monsterHumanoid = model:FindFirstChildOfClass("Humanoid")
-				local monsterHrp = model:FindFirstChild("HumanoidRootPart")
+			if model:IsA("Model") then
+				local realName = getRealMonsterName(model)
+				print("Living model:", model.Name, "=> real:", realName)
 
-				if monsterHumanoid and monsterHrp and monsterHumanoid.Health > 0 then
-					local dist = (monsterHrp.Position - hrp.Position).Magnitude
-					if dist < nearestDistance then
-						nearestDistance = dist
-						nearestMonster = model
+				if isSelectedMonster(realName) then
+					local monsterHumanoid = findMonsterHumanoid(model)
+					local monsterRoot = findMonsterRoot(model)
+
+					if monsterHumanoid and monsterRoot and monsterHumanoid.Health > 0 then
+						local dist = (monsterRoot.Position - hrp.Position).Magnitude
+						if dist < nearestDistance then
+							nearestDistance = dist
+							nearestMonster = model
+						end
 					end
 				end
 			end
+		end
+
+		if nearestMonster then
+			print("Target chosen:", nearestMonster.Name, "real:", getRealMonsterName(nearestMonster))
 		end
 
 		return nearestMonster
@@ -81,10 +143,10 @@ function AutoMonster.run(State)
 				return
 			end
 
-			local monsterHumanoid = monster:FindFirstChildOfClass("Humanoid")
-			local monsterHrp = monster:FindFirstChild("HumanoidRootPart")
+			local monsterHumanoid = findMonsterHumanoid(monster)
+			local monsterRoot = findMonsterRoot(monster)
 
-			if not monsterHumanoid or not monsterHrp then
+			if not monsterHumanoid or not monsterRoot then
 				return
 			end
 
@@ -92,13 +154,13 @@ function AutoMonster.run(State)
 				return
 			end
 
-			local dist = (monsterHrp.Position - hrp.Position).Magnitude
+			local dist = (monsterRoot.Position - hrp.Position).Magnitude
 
 			if dist > 6 then
-				humanoid:MoveTo(monsterHrp.Position)
+				humanoid:MoveTo(monsterRoot.Position)
 			end
 
-			local look = Vector3.new(monsterHrp.Position.X, hrp.Position.Y, monsterHrp.Position.Z)
+			local look = Vector3.new(monsterRoot.Position.X, hrp.Position.Y, monsterRoot.Position.Z)
 			hrp.CFrame = CFrame.lookAt(hrp.Position, look)
 
 			attack()
@@ -128,7 +190,8 @@ function AutoMonster.run(State)
 			if target then
 				followAndAttack(target)
 			else
-				task.wait(0.2)
+				warn("AutoMonster: no matching target found")
+				task.wait(0.5)
 			end
 		end
 	end)
