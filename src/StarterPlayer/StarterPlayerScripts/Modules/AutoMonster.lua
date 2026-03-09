@@ -147,7 +147,7 @@ function AutoMonster.run(State)
 
         local distance = (targetPos - hrp.Position).Magnitude
         if distance < 0.5 then
-            hrp.CFrame = CFrame.lookAt(hrp.Position, facePos)
+            tweenLookAt(hrp, facePos)
             return
         end
 
@@ -165,6 +165,23 @@ function AutoMonster.run(State)
         activeTween.Completed:Wait()
         activeTween = nil
     end
+
+    local function tweenLookAt(hrp, facePos)
+        local targetCF = CFrame.lookAt(
+            hrp.Position,
+            Vector3.new(facePos.X, hrp.Position.Y, facePos.Z)
+        )
+
+        local tween = TweenService:Create(
+            hrp,
+            TweenInfo.new(0.08, Enum.EasingStyle.Linear),
+            { CFrame = targetCF }
+        )
+
+        tween:Play()
+        tween.Completed:Wait()
+    end
+
 	local function followAndAttack(monster)
         local _, humanoid, hrp = getCharacterParts()
 
@@ -200,14 +217,12 @@ function AutoMonster.run(State)
                 if (standPos - hrp.Position).Magnitude > TWEEN_REPOSITION_DISTANCE then
                     tweenToPosition(hrp, standPos, monsterRoot.Position, MOVE_SPEED)
                 else
-                    local look = Vector3.new(monsterRoot.Position.X, hrp.Position.Y, monsterRoot.Position.Z)
-                    hrp.CFrame = CFrame.lookAt(hrp.Position, look)
+                    tweenLookAt(hrp, monsterRoot.Position)
                     task.wait(0.05)
                 end
             else
                 -- อยู่ในระยะแล้ว ค่อยตี
-                local look = Vector3.new(monsterRoot.Position.X, hrp.Position.Y, monsterRoot.Position.Z)
-                hrp.CFrame = CFrame.lookAt(hrp.Position, look)
+                tweenLookAt(hrp, monsterRoot.Position)
                 attack()
                 task.wait(0.15)
             end
