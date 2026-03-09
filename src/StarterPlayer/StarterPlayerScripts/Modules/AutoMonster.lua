@@ -135,12 +135,43 @@ function AutoMonster.run(State)
 		return nearestMonster
 	end
 
+    local TweenService = game:GetService("TweenService")
+
+    local activeTween = nil
+
+    local function tweenToPosition(hrp, targetPos, facePos, speed)
+        if activeTween then
+            activeTween:Cancel()
+            activeTween = nil
+        end
+
+        local distance = (targetPos - hrp.Position).Magnitude
+        if distance < 0.5 then
+            hrp.CFrame = CFrame.lookAt(hrp.Position, facePos)
+            return
+        end
+
+        local tweenTime = math.max(distance / (speed or 55), 0.08)
+
+        activeTween = TweenService:Create(
+            hrp,
+            TweenInfo.new(tweenTime, Enum.EasingStyle.Linear, Enum.EasingDirection.Out),
+            {
+                CFrame = CFrame.lookAt(targetPos, facePos)
+            }
+        )
+
+        activeTween:Play()
+        activeTween.Completed:Wait()
+        activeTween = nil
+    end
 	local function followAndAttack(monster)
         local _, humanoid, hrp = getCharacterParts()
 
         local ATTACK_RANGE = 7
         local STOP_DISTANCE = 4
-        local TELEPORT_IF_FAR = 22
+        local TWEEN_REPOSITION_DISTANCE = 3
+        local MOVE_SPEED = 65
 
         while getgenv().RobloxUIRunning and State.autoMonsterFarm and monster and monster.Parent do
             if State.autoMiner then
@@ -165,14 +196,16 @@ function AutoMonster.run(State)
                 local dir = offset.Unit
                 local standPos = monsterRoot.Position - (dir * STOP_DISTANCE)
 
-                if dist > TELEPORT_IF_FAR then
-                    hrp.CFrame = CFrame.new(standPos, monsterRoot.Position)
-                    task.wait(0.08)
+                -- tween เข้าไปใกล้จุดยืนโจมตี
+                if (standPos - hrp.Position).Magnitude > TWEEN_REPOSITION_DISTANCE then
+                    tweenToPosition(hrp, standPos, monsterRoot.Position, MOVE_SPEED)
                 else
-                    humanoid:MoveTo(standPos)
-                    task.wait(0.12)
+                    local look = Vector3.new(monsterRoot.Position.X, hrp.Position.Y, monsterRoot.Position.Z)
+                    hrp.CFrame = CFrame.lookAt(hrp.Position, look)
+                    task.wait(0.05)
                 end
             else
+                -- อยู่ในระยะแล้ว ค่อยตี
                 local look = Vector3.new(monsterRoot.Position.X, hrp.Position.Y, monsterRoot.Position.Z)
                 hrp.CFrame = CFrame.lookAt(hrp.Position, look)
                 attack()
