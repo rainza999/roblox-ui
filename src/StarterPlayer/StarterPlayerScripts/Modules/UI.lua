@@ -7,13 +7,13 @@ function UI.create(state)
 	local player = Players.LocalPlayer
 	local playerGui = player:WaitForChild("PlayerGui")
 
-	local oldGui = playerGui:FindFirstChild("ControlPanel V.2.3")
+	local oldGui = playerGui:FindFirstChild("ControlPanel V.2.4")
 	if oldGui then
 		oldGui:Destroy()
 	end
 
 	local screenGui = Instance.new("ScreenGui")
-	screenGui.Name = "ControlPanel V.2.3"
+	screenGui.Name = "ControlPanel V.2.4"
 	screenGui.ResetOnSpawn = false
 	screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	screenGui.Parent = playerGui
@@ -70,8 +70,12 @@ function UI.create(state)
 		return s
 	end
 
+	local expandedHeight = 420
+	local collapsedHeight = 48
+	local isCollapsed = false
+
 	local frame = Instance.new("Frame")
-	frame.Size = UDim2.new(0, 340, 0, 300)
+	frame.Size = UDim2.new(0, 340, 0, expandedHeight)
 	frame.AnchorPoint = Vector2.new(0.5, 0.5)
 	frame.Position = UDim2.new(0.5, 0, 0.5, 0)
 	frame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
@@ -79,16 +83,34 @@ function UI.create(state)
 	frame.Parent = screenGui
 	makeCorner(frame, 10)
 
+	local header = Instance.new("Frame")
+	header.Size = UDim2.new(1, 0, 0, 46)
+	header.Position = UDim2.new(0, 0, 0, 0)
+	header.BackgroundTransparency = 1
+	header.Parent = frame
+
 	local title = Instance.new("TextLabel")
-	title.Size = UDim2.new(1, -50, 0, 40)
-	title.Position = UDim2.new(0, 12, 0, 4)
+	title.Size = UDim2.new(1, -90, 1, 0)
+	title.Position = UDim2.new(0, 12, 0, 0)
 	title.BackgroundTransparency = 1
-	title.Text = "Control Panel V.2.3"
+	title.Text = "Control Panel V.2.4"
 	title.Font = Enum.Font.GothamBold
 	title.TextColor3 = Color3.new(1, 1, 1)
 	title.TextSize = 18
 	title.TextXAlignment = Enum.TextXAlignment.Left
-	title.Parent = frame
+	title.Parent = header
+
+	local collapseBtn = Instance.new("TextButton")
+	collapseBtn.Size = UDim2.new(0, 34, 0, 34)
+	collapseBtn.Position = UDim2.new(1, -78, 0, 6)
+	collapseBtn.Text = "—"
+	collapseBtn.Font = Enum.Font.GothamBold
+	collapseBtn.TextSize = 18
+	collapseBtn.TextColor3 = Color3.new(1, 1, 1)
+	collapseBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+	collapseBtn.BorderSizePixel = 0
+	collapseBtn.Parent = header
+	makeCorner(collapseBtn, 8)
 
 	local closeBtn = Instance.new("TextButton")
 	closeBtn.Size = UDim2.new(0, 34, 0, 34)
@@ -99,13 +121,21 @@ function UI.create(state)
 	closeBtn.TextColor3 = Color3.new(1, 1, 1)
 	closeBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
 	closeBtn.BorderSizePixel = 0
-	closeBtn.Parent = frame
+	closeBtn.Parent = header
 	makeCorner(closeBtn, 8)
 
 	closeBtn.MouseButton1Click:Connect(function()
 		getgenv().RobloxUIRunning = false
 		screenGui:Destroy()
 	end)
+
+	local content = Instance.new("Frame")
+	content.Name = "Content"
+	content.Size = UDim2.new(1, 0, 1, -46)
+	content.Position = UDim2.new(0, 0, 0, 46)
+	content.BackgroundTransparency = 1
+	content.ClipsDescendants = true
+	content.Parent = frame
 
 	local function makeButton(text, y)
 		local btn = Instance.new("TextButton")
@@ -117,7 +147,7 @@ function UI.create(state)
 		btn.TextColor3 = Color3.new(1, 1, 1)
 		btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 		btn.BorderSizePixel = 0
-		btn.Parent = frame
+		btn.Parent = content
 		makeCorner(btn, 8)
 		return btn
 	end
@@ -128,7 +158,7 @@ function UI.create(state)
 		selectWrap.Position = UDim2.new(0, 10, 0, y)
 		selectWrap.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
 		selectWrap.BorderSizePixel = 0
-		selectWrap.Parent = frame
+		selectWrap.Parent = content
 		makeCorner(selectWrap, 8)
 		makeStroke(selectWrap, Color3.fromRGB(75, 75, 75), 1, 0)
 
@@ -183,7 +213,7 @@ function UI.create(state)
 		dropdown.ClipsDescendants = true
 		dropdown.Visible = true
 		dropdown.ZIndex = 20
-		dropdown.Parent = frame
+		dropdown.Parent = content
 		makeCorner(dropdown, 8)
 		makeStroke(dropdown, Color3.fromRGB(80, 80, 80), 1, 0)
 
@@ -384,7 +414,13 @@ function UI.create(state)
 			end
 			dropdownOpen = false
 			arrowLabel.Text = "▼"
-			dropdown:TweenSize(UDim2.new(1, -20, 0, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.15, true)
+			dropdown:TweenSize(
+				UDim2.new(1, -20, 0, 0),
+				Enum.EasingDirection.Out,
+				Enum.EasingStyle.Quad,
+				0.15,
+				true
+			)
 			if outsideConnection then
 				outsideConnection:Disconnect()
 				outsideConnection = nil
@@ -398,10 +434,16 @@ function UI.create(state)
 			dropdownOpen = true
 			arrowLabel.Text = "▲"
 			rebuildOptions()
-			dropdown:TweenSize(UDim2.new(1, -20, 0, dropdownHeight or 190), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.15, true)
+			dropdown:TweenSize(
+				UDim2.new(1, -20, 0, dropdownHeight or 190),
+				Enum.EasingDirection.Out,
+				Enum.EasingStyle.Quad,
+				0.15,
+				true
+			)
 
 			outsideConnection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
-				if gameProcessed then
+				if gameProcessed or isCollapsed then
 					return
 				end
 
@@ -422,6 +464,10 @@ function UI.create(state)
 		end
 
 		openBtn.MouseButton1Click:Connect(function()
+			if isCollapsed then
+				return
+			end
+
 			if dropdownOpen then
 				closeDropdown()
 			else
@@ -437,19 +483,21 @@ function UI.create(state)
 		closeDropdown()
 
 		return {
+			selectWrap = selectWrap,
+			dropdown = dropdown,
 			refreshTags = refreshTags,
 			close = closeDropdown,
 		}
 	end
 
-	local bossBtn = makeButton("Auto Boss: OFF", 50)
-	local tBtn = makeButton("Auto T: OFF", 100)
-	local minerBtn = makeButton("Auto Miner: OFF", 150)
+	local bossBtn = makeButton("Auto Boss: OFF", 10)
+	local tBtn = makeButton("Auto T: OFF", 60)
+	local minerBtn = makeButton("Auto Miner: OFF", 110)
 
 	local mineralSelect = createMultiSelect(
 		mineralNames,
 		state.selectedMinerals,
-		205,
+		165,
 		"Select minerals...",
 		190
 	)
@@ -457,7 +505,7 @@ function UI.create(state)
 	local oreSelect = createMultiSelect(
 		oreNames,
 		state.selectedOres,
-		260,
+		220,
 		"Select ores...",
 		190
 	)
@@ -494,9 +542,83 @@ function UI.create(state)
 		refreshButtons()
 	end)
 
+	local dragToggle = nil
+	local dragInput = nil
+	local dragStart = nil
+	local startPos = nil
+
+	local function updateDrag(input)
+		local delta = input.Position - dragStart
+		frame.Position = UDim2.new(
+			startPos.X.Scale,
+			startPos.X.Offset + delta.X,
+			startPos.Y.Scale,
+			startPos.Y.Offset + delta.Y
+		)
+	end
+
+	header.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1
+			or input.UserInputType == Enum.UserInputType.Touch then
+			dragToggle = true
+			dragStart = input.Position
+			startPos = frame.Position
+
+			input.Changed:Connect(function()
+				if input.UserInputState == Enum.UserInputState.End then
+					dragToggle = false
+				end
+			end)
+		end
+	end)
+
+	header.InputChanged:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseMovement
+			or input.UserInputType == Enum.UserInputType.Touch then
+			dragInput = input
+		end
+	end)
+
+	UserInputService.InputChanged:Connect(function(input)
+		if input == dragInput and dragToggle then
+			updateDrag(input)
+		end
+	end)
+
+	local function setCollapsed(collapsed)
+		isCollapsed = collapsed
+
+		if collapsed then
+			mineralSelect.close()
+			oreSelect.close()
+			content.Visible = false
+			frame:TweenSize(
+				UDim2.new(0, 340, 0, collapsedHeight),
+				Enum.EasingDirection.Out,
+				Enum.EasingStyle.Quad,
+				0.15,
+				true
+			)
+			collapseBtn.Text = "+"
+		else
+			content.Visible = true
+			frame:TweenSize(
+				UDim2.new(0, 340, 0, expandedHeight),
+				Enum.EasingDirection.Out,
+				Enum.EasingStyle.Quad,
+				0.15,
+				true
+			)
+			collapseBtn.Text = "—"
+		end
+	end
+
+	collapseBtn.MouseButton1Click:Connect(function()
+		setCollapsed(not isCollapsed)
+	end)
+
 	refreshButtons()
-	refreshTags()
-	closeDropdown()
+	setCollapsed(false)
 
 	return screenGui
 end
