@@ -29,39 +29,49 @@ function AutoMiner.run(State)
 	end
 
     local function setMode(mode)
-		if currentMode == mode then
-			return true
-		end
+        if currentMode == mode then
+            return true
+        end
 
-		if mode == "mining" then
-			print("[AutoMiner] Switch mode -> mining")
-			pressKey(Enum.KeyCode.One)
+        if mode == "mining" then
+            print("[AutoMiner] Switch mode -> mining")
+            print("[DEBUG] pressKey =", typeof(pressKey), pressKey)
+            print("[DEBUG] waitForPickaxeModel =", typeof(waitForPickaxeModel), waitForPickaxeModel)
+            print("[DEBUG] VirtualInputManager =", VirtualInputManager)
+            print("[DEBUG] SendKeyEvent =", VirtualInputManager and VirtualInputManager.SendKeyEvent)
 
-			local ok = waitForPickaxeModel(2)
-			if ok then
-				currentMode = mode
-				return true
-			else
-				warn("[AutoMiner] PickaxeModel not found after pressing 1")
-				return false
-			end
+            pressKey(Enum.KeyCode.One)
 
-		elseif mode == "combat" then
-			print("[AutoMiner] Switch mode -> combat")
-			pressKey(Enum.KeyCode.Two)
+            local ok = waitForPickaxeModel(2)
+            if ok then
+                currentMode = mode
+                return true
+            else
+                warn("[AutoMiner] PickaxeModel not found after pressing 1")
+                return false
+            end
 
-			local ok = waitForWeaponModel(2)
-			if ok then
-				currentMode = mode
-				return true
-			else
-				warn("[AutoMiner] WeaponModel not found after pressing 2")
-				return false
-			end
-		end
+        elseif mode == "combat" then
+            print("[AutoMiner] Switch mode -> combat")
+            print("[DEBUG] pressKey =", typeof(pressKey), pressKey)
+            print("[DEBUG] waitForWeaponModel =", typeof(waitForWeaponModel), waitForWeaponModel)
+            print("[DEBUG] VirtualInputManager =", VirtualInputManager)
+            print("[DEBUG] SendKeyEvent =", VirtualInputManager and VirtualInputManager.SendKeyEvent)
 
-		return false
-	end
+            pressKey(Enum.KeyCode.Two)
+
+            local ok = waitForWeaponModel(2)
+            if ok then
+                currentMode = mode
+                return true
+            else
+                warn("[AutoMiner] WeaponModel not found after pressing 2")
+                return false
+            end
+        end
+
+        return false
+    end
 
 	local skippedMinerals = {}
 
