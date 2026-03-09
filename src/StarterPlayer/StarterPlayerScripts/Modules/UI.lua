@@ -771,6 +771,7 @@ function UI.create(state)
 			locationSelect.close()
 			mineralSelect.close()
 			oreSelect.close()
+			monsterSelect.close()
 			content.Visible = false
 			frame:TweenSize(
 				UDim2.new(0, 340, 0, collapsedHeight),
