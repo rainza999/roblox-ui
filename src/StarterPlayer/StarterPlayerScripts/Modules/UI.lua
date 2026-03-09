@@ -46,7 +46,7 @@ function UI.create(state)
 		"Elite Orc",
 		"Yeti",
 		"Common Orc",
-	},
+	}
 
 	state.selectedLocations = state.selectedLocations or {}
 	for _, name in ipairs(locationNames) do
