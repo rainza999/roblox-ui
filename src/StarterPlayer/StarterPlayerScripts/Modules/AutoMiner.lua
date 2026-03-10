@@ -250,6 +250,9 @@ function AutoMiner.run(State)
 
     local function getLocationPriorityList()
 		return {
+            "2s",
+            "I4_HolyCave_03_1",
+            "I4_HolyCave_03_2",
 			"Island3CavePeakEnd",
 			"Island3CavePeakBarrier",
 			"Island3RedCave",
@@ -258,6 +261,8 @@ function AutoMiner.run(State)
 
 	local function getPriorityList()
 		return {
+            "Blossom Boulder",
+		    "Glowy Rock",
 			"Floating Crystal",
 			"Large Red Crystal",
 			"Large Ice Crystal",
@@ -269,6 +274,8 @@ function AutoMiner.run(State)
 
     local function getAllMineralTypes()
 		return {
+            "Blossom Boulder",
+		    "Glowy Rock",
 			"Floating Crystal",
 			"Large Red Crystal",
 			"Large Ice Crystal",
