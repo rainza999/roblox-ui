@@ -1,7 +1,7 @@
 local AutoMonster = {}
 
 function AutoMonster.run(State)
-	print("AutoMonster Run on file moveTo 123")
+	print("AutoMonster Run on file moveTo 555")
 
 	local Players = game:GetService("Players")
 	local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -306,7 +306,7 @@ function AutoMonster.run(State)
 					task.wait(0.05)
 				end
 			else
-				snapToGroundNearCurrentPosition()
+				-- snapToGroundNearCurrentPosition()
 				lookAtTarget(hrp, monsterPos)
 				attack()
 				task.wait(0.15)
