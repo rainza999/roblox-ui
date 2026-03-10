@@ -1,7 +1,7 @@
 local AutoMonster = {}
 
 function AutoMonster.run(State)
-    print("AutoMonster Run on file xxx")
+    print("AutoMonster Run on file xxx2")
 	local Players = game:GetService("Players")
 	local ReplicatedStorage = game:GetService("ReplicatedStorage")
 	local TweenService = game:GetService("TweenService")
@@ -9,7 +9,6 @@ function AutoMonster.run(State)
 	local player = Players.LocalPlayer
 	local activeTween = nil
 
-	local FLY_Y = 120
 	local ATTACK_RANGE = 10
 	local STOP_DISTANCE = 6
 	local TWEEN_REPOSITION_DISTANCE = 4
@@ -20,6 +19,16 @@ function AutoMonster.run(State)
 		local humanoid = character:WaitForChild("Humanoid")
 		local hrp = character:WaitForChild("HumanoidRootPart")
 		return character, humanoid, hrp
+	end
+
+    local function getCharacterGroundOffset(character)
+		local hrp = character:FindFirstChild("HumanoidRootPart")
+		if not hrp then
+			return 3
+		end
+
+		local _, size = character:GetBoundingBox()
+		return math.max((size.Y / 2) + 0.5, 3)
 	end
 
 	local function attack()
@@ -50,7 +59,26 @@ function AutoMonster.run(State)
 		return false
 	end
 
+    local function getGroundY(x, z, ignoreList)
+		local rayParams = RaycastParams.new()
+		rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+		rayParams.FilterDescendantsInstances = ignoreList or {}
+		rayParams.IgnoreWater = false
+
+		local origin = Vector3.new(x, 500, z)
+		local direction = Vector3.new(0, -1000, 0)
+
+		local result = workspace:Raycast(origin, direction, rayParams)
+		if result then
+			return result.Position.Y, result
+		end
+
+		return nil, nil
+	end
+
     local function getStandPosition(currentPos, monsterPos)
+		local character, _, hrp = getCharacterParts()
+
 		local flatDir = Vector3.new(
 			monsterPos.X - currentPos.X,
 			0,
@@ -63,11 +91,20 @@ function AutoMonster.run(State)
 			flatDir = Vector3.new(0, 0, -1)
 		end
 
-		return Vector3.new(
-			monsterPos.X - flatDir.X * STOP_DISTANCE,
-			currentPos.Y,
-			monsterPos.Z - flatDir.Z * STOP_DISTANCE
-		)
+		local targetX = monsterPos.X - flatDir.X * STOP_DISTANCE
+		local targetZ = monsterPos.Z - flatDir.Z * STOP_DISTANCE
+
+		local groundY, groundHit = getGroundY(targetX, targetZ, {character})
+
+		local y
+		if groundY then
+			local offset = getCharacterGroundOffset(character)
+			y = groundY + offset
+		else
+			y = currentPos.Y
+		end
+
+		return Vector3.new(targetX, y, targetZ)
 	end
 
 	local function findMonsterRoot(model)
@@ -206,6 +243,23 @@ function AutoMonster.run(State)
 		return nearestMonster
 	end
 
+    local function snapToGroundNearCurrentPosition()
+		local character, humanoid, hrp = getCharacterParts()
+
+		local groundY = getGroundY(hrp.Position.X, hrp.Position.Z, {character})
+		if not groundY then
+			return
+		end
+
+		local offset = getCharacterGroundOffset(character)
+		local fixedPos = Vector3.new(hrp.Position.X, groundY + offset, hrp.Position.Z)
+
+		hrp.CFrame = CFrame.lookAt(
+			fixedPos,
+			fixedPos + hrp.CFrame.LookVector
+		)
+	end
+
     local function followAndAttack(monster)
 		local _, humanoid, hrp = getCharacterParts()
 
@@ -239,6 +293,7 @@ function AutoMonster.run(State)
 					task.wait(0.05)
 				end
 			else
+				snapToGroundNearCurrentPosition()
 				tweenLookAt(hrp, monsterPos)
 				attack()
 				task.wait(0.15)
