@@ -107,24 +107,39 @@ function AutoMonster.run(State)
 		local dz = a.Z - b.Z
 		return math.sqrt(dx * dx + dz * dz)
 	end
+	local function setTweenLock(character, humanoid, hrp, locked)
+		if hrp then
+			hrp.Anchored = locked
+			hrp.AssemblyLinearVelocity = Vector3.zero
+			hrp.AssemblyAngularVelocity = Vector3.zero
+		end
 
-	local function tweenLookAt(hrp, facePos)
+		if humanoid then
+			if locked then
+				humanoid.AutoRotate = false
+				pcall(function()
+					humanoid:ChangeState(Enum.HumanoidStateType.Physics)
+				end)
+			else
+				humanoid.AutoRotate = true
+				pcall(function()
+					humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+				end)
+			end
+		end
+	end
+    local function tweenLookAt(hrp, facePos)
 		local targetCF = CFrame.lookAt(
 			hrp.Position,
 			Vector3.new(facePos.X, hrp.Position.Y, facePos.Z)
 		)
 
-		local tween = TweenService:Create(
-			hrp,
-			TweenInfo.new(0.08, Enum.EasingStyle.Linear),
-			{ CFrame = targetCF }
-		)
-
-		tween:Play()
-		tween.Completed:Wait()
+		hrp.CFrame = targetCF
 	end
 
-	local function tweenToPosition(hrp, targetPos, facePos, speed)
+    local function tweenToPosition(hrp, targetPos, facePos, speed)
+		local character, humanoid = getCharacterParts()
+
 		if activeTween then
 			activeTween:Cancel()
 			activeTween = nil
@@ -137,6 +152,8 @@ function AutoMonster.run(State)
 		end
 
 		local tweenTime = math.max(distance / (speed or 55), 0.08)
+
+		setTweenLock(character, humanoid, hrp, true)
 
 		activeTween = TweenService:Create(
 			hrp,
@@ -152,6 +169,15 @@ function AutoMonster.run(State)
 		activeTween:Play()
 		activeTween.Completed:Wait()
 		activeTween = nil
+
+		if hrp and hrp.Parent then
+			hrp.CFrame = CFrame.lookAt(
+				targetPos,
+				Vector3.new(facePos.X, targetPos.Y, facePos.Z)
+			)
+		end
+
+		setTweenLock(character, humanoid, hrp, false)
 	end
 
 	local function findTargetMonster()
@@ -239,7 +265,10 @@ function AutoMonster.run(State)
 					local hoverPos = Vector3.new(currentPos.X, FLY_Y, currentPos.Z)
 					tweenToPosition(hrp, hoverPos, monsterPos, MOVE_SPEED)
 				else
-					tweenLookAt(hrp, monsterPos)
+					hrp.CFrame = CFrame.lookAt(
+						Vector3.new(hrp.Position.X, FLY_Y, hrp.Position.Z),
+						Vector3.new(monsterPos.X, FLY_Y, monsterPos.Z)
+					)
 					attack()
 					task.wait(0.15)
 				end
