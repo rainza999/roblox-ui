@@ -49,6 +49,26 @@ function AutoMonster.run(State)
 		return false
 	end
 
+    local function getStandPosition(currentPos, monsterPos)
+		local flatDir = Vector3.new(
+			monsterPos.X - currentPos.X,
+			0,
+			monsterPos.Z - currentPos.Z
+		)
+
+		if flatDir.Magnitude > 0 then
+			flatDir = flatDir.Unit
+		else
+			flatDir = Vector3.new(0, 0, -1)
+		end
+
+		return Vector3.new(
+			monsterPos.X - flatDir.X * STOP_DISTANCE,
+			currentPos.Y,
+			monsterPos.Z - flatDir.Z * STOP_DISTANCE
+		)
+	end
+
 	local function findMonsterRoot(model)
 		return model:FindFirstChild("HumanoidRootPart", true)
 			or model:FindFirstChild("RootPart", true)
@@ -108,36 +128,18 @@ function AutoMonster.run(State)
 		return math.sqrt(dx * dx + dz * dz)
 	end
 	local function setTweenLock(character, humanoid, hrp, locked)
-		if hrp then
-			hrp.Anchored = locked
-			hrp.AssemblyLinearVelocity = Vector3.zero
-			hrp.AssemblyAngularVelocity = Vector3.zero
-		end
-
 		if humanoid then
-			if locked then
-				humanoid.AutoRotate = false
-				pcall(function()
-					humanoid:ChangeState(Enum.HumanoidStateType.Physics)
-				end)
-			else
-				humanoid.AutoRotate = true
-				pcall(function()
-					humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
-				end)
-			end
+			humanoid.AutoRotate = not locked
 		end
 	end
-    local function tweenLookAt(hrp, facePos)
-		local targetCF = CFrame.lookAt(
+	local function tweenLookAt(hrp, facePos)
+		hrp.CFrame = CFrame.lookAt(
 			hrp.Position,
 			Vector3.new(facePos.X, hrp.Position.Y, facePos.Z)
 		)
-
-		hrp.CFrame = targetCF
 	end
 
-    local function tweenToPosition(hrp, targetPos, facePos, speed)
+	local function tweenToPosition(hrp, targetPos, facePos, speed)
 		local character, humanoid = getCharacterParts()
 
 		if activeTween then
@@ -170,16 +172,9 @@ function AutoMonster.run(State)
 		activeTween.Completed:Wait()
 		activeTween = nil
 
-		if hrp and hrp.Parent then
-			hrp.CFrame = CFrame.lookAt(
-				targetPos,
-				Vector3.new(facePos.X, targetPos.Y, facePos.Z)
-			)
-		end
-
 		setTweenLock(character, humanoid, hrp, false)
 	end
-
+    
 	local function findTargetMonster()
 		local living = workspace:FindFirstChild("Living")
 		if not living then
@@ -211,7 +206,7 @@ function AutoMonster.run(State)
 		return nearestMonster
 	end
 
-	local function followAndAttack(monster)
+    local function followAndAttack(monster)
 		local _, humanoid, hrp = getCharacterParts()
 
 		while getgenv().RobloxUIRunning and State.autoMonsterFarm and monster and monster.Parent do
@@ -234,44 +229,19 @@ function AutoMonster.run(State)
 			local monsterPos = monsterRoot.Position
 			local horizontalDist = getHorizontalDistance(currentPos, monsterPos)
 
-			local flatDir = Vector3.new(
-				monsterPos.X - currentPos.X,
-				0,
-				monsterPos.Z - currentPos.Z
-			)
-
-			if flatDir.Magnitude > 0 then
-				flatDir = flatDir.Unit
-			else
-				flatDir = Vector3.new(0, 0, -1)
-			end
-
-			local standPos = Vector3.new(
-				monsterPos.X - flatDir.X * STOP_DISTANCE,
-				FLY_Y,
-				monsterPos.Z - flatDir.Z * STOP_DISTANCE
-			)
+			local standPos = getStandPosition(currentPos, monsterPos)
 
 			if horizontalDist > ATTACK_RANGE then
-				if (standPos - currentPos).Magnitude > TWEEN_REPOSITION_DISTANCE then
+				if (Vector3.new(standPos.X, currentPos.Y, standPos.Z) - currentPos).Magnitude > TWEEN_REPOSITION_DISTANCE then
 					tweenToPosition(hrp, standPos, monsterPos, MOVE_SPEED)
 				else
 					tweenLookAt(hrp, monsterPos)
 					task.wait(0.05)
 				end
 			else
-				-- ค้างระดับสูงไว้ตลอด
-				if math.abs(currentPos.Y - FLY_Y) > 2 then
-					local hoverPos = Vector3.new(currentPos.X, FLY_Y, currentPos.Z)
-					tweenToPosition(hrp, hoverPos, monsterPos, MOVE_SPEED)
-				else
-					hrp.CFrame = CFrame.lookAt(
-						Vector3.new(hrp.Position.X, FLY_Y, hrp.Position.Z),
-						Vector3.new(monsterPos.X, FLY_Y, monsterPos.Z)
-					)
-					attack()
-					task.wait(0.15)
-				end
+				tweenLookAt(hrp, monsterPos)
+				attack()
+				task.wait(0.15)
 			end
 
 			local character = player.Character
