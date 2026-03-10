@@ -1,7 +1,7 @@
 local AutoMonster = {}
 
 function AutoMonster.run(State)
-	print("AutoMonster Run on file moveTo 555")
+	print("AutoMonster Run on file moveTo 555678")
 
 	local Players = game:GetService("Players")
 	local ReplicatedStorage = game:GetService("ReplicatedStorage")
