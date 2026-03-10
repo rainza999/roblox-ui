@@ -25,6 +25,8 @@ function UI.create(state)
 	}
 	
 	local mineralNames = {
+		"Blossom Boulder",
+		"Glowy Rock",
 		"Floating Crystal",
 		"Large Red Crystal",
 		"Large Ice Crystal",
@@ -34,6 +36,9 @@ function UI.create(state)
 	}
 
 	local oreNames = {
+		"Onyx",
+		"Heavenly Orb",
+		"Lucky Cat",
 		"Heavenite",
 		"Gargantuan",
 		"Suryafal",
@@ -43,6 +48,19 @@ function UI.create(state)
 	}
 
 	local monsterNames = {
+
+		"Hellflame Oni",
+		"Warlord Oni",
+		"Frostburn Oni",
+		"Brute Oni",
+
+		"Monk Panda",
+		"Samurai Ape",
+		"Savage Ape",
+		"Mountain Ape",
+
+		"Chuthlu",
+		"Skeleton Pirate",
 		"Elite Orc",
 		"Yeti",
 		"Common Orc",

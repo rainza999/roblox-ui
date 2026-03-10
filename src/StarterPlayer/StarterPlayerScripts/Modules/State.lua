@@ -22,20 +22,25 @@ local State = {
 
 	selectedLocations = {
 		["Island3CavePeakBarrier"] = false,
-		["Island3CavePeakEnd"] = true,
+		["Island3CavePeakEnd"] = false,
 		["Island3RedCave"] = false,
 	},
 
 	selectedMinerals = {
-		["Floating Crystal"] = true,
-		["Large Red Crystal"] = true,
-		["Large Ice Crystal"] = true,
+		["Blossom Boulder"] = true,
+		["Glowy Rock"] = false,
+		["Floating Crystal"] = false,
+		["Large Red Crystal"] = false,
+		["Large Ice Crystal"] = false,
 		["Medium Red Crystal"] = false,
 		["Medium Ice Crystal"] = false,
 		["Small Red Crystal"] = false,
 	},
 
 	selectedOres = {
+		["Onyx"] = true,
+		["Heavenly Orb"] = true,
+		["Lucky Cat"] = true,
 		["Heavenite"] = false,
 		["Gargantuan"] = false,
 		["Suryafal"] = false,
@@ -45,6 +50,8 @@ local State = {
 	},
 
 	clearLimits = {
+		["Blossom Boulder"] = 0,
+		["Glowy Rock"] = 0,
 		["Floating Crystal"] = 0,
 		["Large Red Crystal"] = 0,
 		["Large Ice Crystal"] = 0,
@@ -54,12 +61,33 @@ local State = {
 	},
 
 	selectedMonsters = {
-		["Yeti"] = true,
-		["Common Orc"] = true,
-		["Elite Orc"] = true,
+		["Hellflame Oni"] = true,
+		["Warlord Oni"] = true,
+		["Frostburn Oni"] = true,
+		["Brute Oni"] = false,
+
+		["Monk Panda"] = false,
+		["Samurai Ape"] = false,
+		["Savage Ape"] = false,
+		["Mountain Ape"] = false,
+
+		["Yeti"] = false,
+		["Common Orc"] = false,
+		["Elite Orc"] = false,
 	},
 
 	monsterPriority = {
+
+		"Hellflame Oni",
+		"Warlord Oni",
+		"Frostburn Oni",
+		"Brute Oni",
+
+		"Monk Panda",
+		"Samurai Ape",
+		"Savage Ape",
+		"Mountain Ape",
+		
 		"Elite Orc",
 		"Yeti",
 		"Common Orc",
