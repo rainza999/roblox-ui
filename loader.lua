@@ -46,9 +46,18 @@ task.spawn(function()
 	AutoMiner.run(State)
 end)
 
+print("AutoMonster module =", AutoMonster)
+print("AutoMonster.run =", AutoMonster and AutoMonster.run)
+
 task.spawn(function()
+	print("calling AutoMonster.run...")
 	AutoMonster.run(State)
+	print("AutoMonster.run returned")
 end)
+
+-- task.spawn(function()
+-- 	AutoMonster.run(State)
+-- end)
 
 UI.create(State, PotionManager, AutoMiner, AutoMonster)
 
