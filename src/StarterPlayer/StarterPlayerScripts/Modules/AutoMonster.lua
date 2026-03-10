@@ -4,16 +4,15 @@ function AutoMonster.run(State)
 	local Players = game:GetService("Players")
 	local ReplicatedStorage = game:GetService("ReplicatedStorage")
 	local TweenService = game:GetService("TweenService")
-	local Workspace = game:GetService("Workspace")
 
 	local player = Players.LocalPlayer
 	local activeTween = nil
 
-	local FLOAT_HEIGHT = 12 -- ลอยสูงจากตำแหน่งมอน/ผิวน้ำประมาณนี้
-	local ATTACK_RANGE = 7
-	local STOP_DISTANCE = 4
-	local TWEEN_REPOSITION_DISTANCE = 3
-	local MOVE_SPEED = 65
+	local FLY_Y = 120
+	local ATTACK_RANGE = 10
+	local STOP_DISTANCE = 6
+	local TWEEN_REPOSITION_DISTANCE = 4
+	local MOVE_SPEED = 90
 
 	local function getCharacterParts()
 		local character = player.Character or player.CharacterAdded:Wait()
@@ -109,10 +108,6 @@ function AutoMonster.run(State)
 		return math.sqrt(dx * dx + dz * dz)
 	end
 
-	local function getFloatPosition(targetPos, height)
-		return Vector3.new(targetPos.X, targetPos.Y + height, targetPos.Z)
-	end
-
 	local function tweenLookAt(hrp, facePos)
 		local targetCF = CFrame.lookAt(
 			hrp.Position,
@@ -147,7 +142,10 @@ function AutoMonster.run(State)
 			hrp,
 			TweenInfo.new(tweenTime, Enum.EasingStyle.Linear, Enum.EasingDirection.Out),
 			{
-				CFrame = CFrame.lookAt(targetPos, Vector3.new(facePos.X, targetPos.Y, facePos.Z))
+				CFrame = CFrame.lookAt(
+					targetPos,
+					Vector3.new(facePos.X, targetPos.Y, facePos.Z)
+				)
 			}
 		)
 
@@ -159,7 +157,6 @@ function AutoMonster.run(State)
 	local function findTargetMonster()
 		local living = workspace:FindFirstChild("Living")
 		if not living then
-			warn("AutoMonster: Living folder not found")
 			return nil
 		end
 
@@ -170,7 +167,6 @@ function AutoMonster.run(State)
 		for _, model in ipairs(living:GetChildren()) do
 			if model:IsA("Model") then
 				local realName = getRealMonsterName(model)
-
 				if isSelectedMonster(realName) then
 					local monsterHumanoid = findMonsterHumanoid(model)
 					local monsterRoot = findMonsterRoot(model)
@@ -208,42 +204,39 @@ function AutoMonster.run(State)
 				return
 			end
 
-			local monsterPos = monsterRoot.Position
 			local currentPos = hrp.Position
+			local monsterPos = monsterRoot.Position
+			local horizontalDist = getHorizontalDistance(currentPos, monsterPos)
 
-			-- ใช้ระยะแนวราบแทน จะได้ไม่งงเพราะเราลอยอยู่สูง
-			local horizontalDist = getHorizontalDistance(monsterPos, currentPos)
+			local flatDir = Vector3.new(
+				monsterPos.X - currentPos.X,
+				0,
+				monsterPos.Z - currentPos.Z
+			)
+
+			if flatDir.Magnitude > 0 then
+				flatDir = flatDir.Unit
+			else
+				flatDir = Vector3.new(0, 0, -1)
+			end
+
+			local standPos = Vector3.new(
+				monsterPos.X - flatDir.X * STOP_DISTANCE,
+				FLY_Y,
+				monsterPos.Z - flatDir.Z * STOP_DISTANCE
+			)
 
 			if horizontalDist > ATTACK_RANGE then
-				local flatDir = Vector3.new(
-					monsterPos.X - currentPos.X,
-					0,
-					monsterPos.Z - currentPos.Z
-				)
-
-				if flatDir.Magnitude > 0 then
-					flatDir = flatDir.Unit
-				else
-					flatDir = Vector3.new(0, 0, -1)
-				end
-
-				-- จุดยืนโจมตี: ถอยจากมอนนิดนึง แต่บังคับ Y ให้ลอย
-				local standFlat = Vector3.new(
-					monsterPos.X - (flatDir.X * STOP_DISTANCE),
-					monsterPos.Y + FLOAT_HEIGHT,
-					monsterPos.Z - (flatDir.Z * STOP_DISTANCE)
-				)
-
-				if (standFlat - currentPos).Magnitude > TWEEN_REPOSITION_DISTANCE then
-					tweenToPosition(hrp, standFlat, monsterPos, MOVE_SPEED)
+				if (standPos - currentPos).Magnitude > TWEEN_REPOSITION_DISTANCE then
+					tweenToPosition(hrp, standPos, monsterPos, MOVE_SPEED)
 				else
 					tweenLookAt(hrp, monsterPos)
 					task.wait(0.05)
 				end
 			else
-				-- ถึงระยะตีแล้ว แต่ยังคงลอยไว้
-				local hoverPos = Vector3.new(currentPos.X, monsterPos.Y + FLOAT_HEIGHT, currentPos.Z)
-				if math.abs(currentPos.Y - hoverPos.Y) > 1 then
+				-- ค้างระดับสูงไว้ตลอด
+				if math.abs(currentPos.Y - FLY_Y) > 2 then
+					local hoverPos = Vector3.new(currentPos.X, FLY_Y, currentPos.Z)
 					tweenToPosition(hrp, hoverPos, monsterPos, MOVE_SPEED)
 				else
 					tweenLookAt(hrp, monsterPos)
@@ -267,7 +260,6 @@ function AutoMonster.run(State)
 			end
 
 			if not hasAnySelectedMonster() then
-				warn("AutoMonster: no selected monsters")
 				task.wait(0.5)
 				continue
 			end
@@ -276,7 +268,6 @@ function AutoMonster.run(State)
 			if target then
 				followAndAttack(target)
 			else
-				warn("AutoMonster: no matching target found")
 				task.wait(0.5)
 			end
 		end
