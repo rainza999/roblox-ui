@@ -81,6 +81,11 @@ local State = {
 		["Yeti"] = false,
 		["Common Orc"] = false,
 		["Elite Orc"] = false,
+
+		["Crystal Spider"] = false,
+		["Diamond Spider"] = false,
+		["Prismarine Spider"] = false,
+
 	},
 
 	monsterPriority = {
@@ -100,6 +105,10 @@ local State = {
 		"Elite Orc",
 		"Yeti",
 		"Common Orc",
+
+		"Crystal Spider",
+		"Diamond Spider",
+		"Prismarine Spider",
 	},
 
 	activeController = nil,

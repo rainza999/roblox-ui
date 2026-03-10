@@ -67,6 +67,10 @@ function UI.create(state)
 		"Elite Orc",
 		"Yeti",
 		"Common Orc",
+
+		"Crystal Spider",
+		"Diamond Spider",
+		"Prismarine Spider",
 	}
 
 	state.selectedLocations = state.selectedLocations or {}
