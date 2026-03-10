@@ -502,24 +502,45 @@ function AutoMiner.run(State)
 		return nearestMonster
 	end
 
-	local function moveToTargetPart(targetPart, offsetZ)
+	local function moveToTargetPart(targetPart, stopDistance)
         if isPausedForAutoMiner() then
             return false
         end
 
         local _, _, hrp = getCharacterParts()
 
-        if not targetPart then
+        if not targetPart or not targetPart.Parent then
             return false
         end
 
-        local targetCF = targetPart.CFrame * CFrame.new(0, 0, offsetZ or 4)
-        local dist = (targetCF.Position - hrp.Position).Magnitude
+        local targetPos = targetPart.Position
+        local myPos = hrp.Position
+
+        local flatDir = Vector3.new(
+            targetPos.X - myPos.X,
+            0,
+            targetPos.Z - myPos.Z
+        )
+
+        if flatDir.Magnitude <= 0.05 then
+            return true
+        end
+
+        flatDir = flatDir.Unit
+
+        local desiredPos = Vector3.new(
+            targetPos.X - flatDir.X * (stopDistance or 4),
+            myPos.Y,
+            targetPos.Z - flatDir.Z * (stopDistance or 4)
+        )
+
+        local desiredCF = CFrame.lookAt(desiredPos, Vector3.new(targetPos.X, desiredPos.Y, targetPos.Z))
+        local dist = (desiredPos - myPos).Magnitude
 
         local tween = TweenService:Create(
             hrp,
-            TweenInfo.new(math.max(dist / 60, 0.05)),
-            { CFrame = targetCF }
+            TweenInfo.new(math.max(dist / 60, 0.05), Enum.EasingStyle.Linear),
+            { CFrame = desiredCF }
         )
 
         tween:Play()
@@ -529,6 +550,12 @@ function AutoMiner.run(State)
                 tween:Cancel()
                 return false
             end
+
+            if not targetPart or not targetPart.Parent then
+                tween:Cancel()
+                return false
+            end
+
             task.wait(0.05)
         end
 
@@ -554,55 +581,76 @@ function AutoMiner.run(State)
     end
 
 	local function attackMonster(monster)
-		local timeout = tick() + 12
+        local timeout = tick() + 12
 
-		while getgenv().RobloxUIRunning and State.autoMiner and monster and monster.Parent and tick() < timeout do
-			if isPausedForAutoMiner() then
+        while getgenv().RobloxUIRunning and State.autoMiner and monster and monster.Parent and tick() < timeout do
+            if isPausedForAutoMiner() then
                 return false
             end
+
             if not isMonsterAlive(monster) then
-				return true
-			end
+                return true
+            end
 
-			local part = getMonsterPart(monster)
-			if not part then
-				return true
-			end
+            local part = getMonsterPart(monster)
+            if not part then
+                return true
+            end
 
-			local _, _, hrp = getCharacterParts()
-			local dist = (part.Position - hrp.Position).Magnitude
+            local _, _, hrp = getCharacterParts()
+            local dist = (part.Position - hrp.Position).Magnitude
 
-			if dist > 10 then
-				moveToTargetPart(part, 4)
-			end
+            if dist > 10 then
+                local moved = moveToTargetPart(part, 4)
+                if not moved then
+                    return false
+                end
+
+                -- move เสร็จแล้วดึง part ใหม่ เผื่อมอนขยับ
+                part = getMonsterPart(monster)
+                if not part then
+                    return true
+                end
+            end
 
             if isPausedForAutoMiner() then
                 return false
             end
-            
-			-- ตอนนี้ใช้ mining() ไปก่อน เพราะบางเกมใช้ ToolActivated ตัวเดียวกัน
-			attack()
-			task.wait(0.12)
 
-			if not isMonsterAlive(monster) then
-				return true
-			end
+            -- บังคับหันหน้าก่อนตีทุกครั้ง
+            faceTargetPart(part)
 
-			-- ถ้ามอนหลุดไปไกลมาก ถือว่าพอแล้ว กลับไปตีหิน
-			local _, _, hrp2 = getCharacterParts()
-			local part2 = getMonsterPart(monster)
-			if not part2 then
-				return true
-			end
+            -- เผื่อเน็ต/physics แกว่งนิดนึง
+            task.wait(0.03)
 
-			local dist2 = (part2.Position - hrp2.Position).Magnitude
-			if dist2 > 35 then
-				return false
-			end
-		end
+            -- หันซ้ำอีกที กันมอนเดินระหว่างเฟรม
+            part = getMonsterPart(monster)
+            if not part then
+                return true
+            end
+            faceTargetPart(part)
 
-		return false
-	end
+            attack()
+            task.wait(0.12)
+
+            if not isMonsterAlive(monster) then
+                return true
+            end
+
+            local _, _, hrp2 = getCharacterParts()
+            local part2 = getMonsterPart(monster)
+            if not part2 then
+                return true
+            end
+
+            local dist2 = (part2.Position - hrp2.Position).Magnitude
+            if dist2 > 35 then
+                return false
+            end
+        end
+
+        return false
+    end
 
 	local function handleNearbyMonster()
         if isPausedForAutoMiner() then
