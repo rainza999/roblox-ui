@@ -1,23 +1,35 @@
 local AutoMonster = {}
 
 function AutoMonster.run(State)
-	print("AutoMonster Run on file moveTo 555678")
-    print("KUY")
+	print("AutoMonster Run Tween Mode222")
+
 	local Players = game:GetService("Players")
 	local ReplicatedStorage = game:GetService("ReplicatedStorage")
+	local TweenService = game:GetService("TweenService")
 
 	local player = Players.LocalPlayer
+	local activeTween = nil
 
 	local ATTACK_RANGE = 10
 	local STOP_DISTANCE = 6
 	local REPOSITION_DISTANCE = 4
-	local MOVE_TIMEOUT = 2.5
+	local MOVE_SPEED = 90
+	local ATTACK_INTERVAL = 0.15
 
 	local function getCharacterParts()
 		local character = player.Character or player.CharacterAdded:Wait()
 		local humanoid = character:WaitForChild("Humanoid")
 		local hrp = character:WaitForChild("HumanoidRootPart")
 		return character, humanoid, hrp
+	end
+
+	local function cancelActiveTween()
+		if activeTween then
+			pcall(function()
+				activeTween:Cancel()
+			end)
+			activeTween = nil
+		end
 	end
 
 	local function getCharacterGroundOffset(character)
@@ -73,37 +85,6 @@ function AutoMonster.run(State)
 		end
 
 		return nil, nil
-	end
-
-	local function getStandPosition(currentPos, monsterPos, monster)
-		local character = player.Character or player.CharacterAdded:Wait()
-
-		local flatDir = Vector3.new(
-			monsterPos.X - currentPos.X,
-			0,
-			monsterPos.Z - currentPos.Z
-		)
-
-		if flatDir.Magnitude > 0 then
-			flatDir = flatDir.Unit
-		else
-			flatDir = Vector3.new(0, 0, -1)
-		end
-
-		local targetX = monsterPos.X - flatDir.X * STOP_DISTANCE
-		local targetZ = monsterPos.Z - flatDir.Z * STOP_DISTANCE
-
-		local groundY = getGroundY(targetX, targetZ, { character, monster })
-
-		local y
-		if groundY then
-			local offset = getCharacterGroundOffset(character)
-			y = groundY + offset
-		else
-			y = currentPos.Y
-		end
-
-		return Vector3.new(targetX, y, targetZ)
 	end
 
 	local function findMonsterRoot(model)
@@ -172,29 +153,65 @@ function AutoMonster.run(State)
 		)
 	end
 
-	local function moveToPosition(targetPos, facePos)
+	local function getStandPosition(currentPos, monsterPos, monster)
+		local character = player.Character or player.CharacterAdded:Wait()
+
+		local flatDir = Vector3.new(
+			monsterPos.X - currentPos.X,
+			0,
+			monsterPos.Z - currentPos.Z
+		)
+
+		if flatDir.Magnitude > 0 then
+			flatDir = flatDir.Unit
+		else
+			flatDir = Vector3.new(0, 0, -1)
+		end
+
+		local targetX = monsterPos.X - flatDir.X * STOP_DISTANCE
+		local targetZ = monsterPos.Z - flatDir.Z * STOP_DISTANCE
+
+		local groundY = getGroundY(targetX, targetZ, { character, monster })
+
+		local y
+		if groundY then
+			local offset = getCharacterGroundOffset(character)
+			y = groundY + offset
+		else
+			y = currentPos.Y
+		end
+
+		return Vector3.new(targetX, y, targetZ)
+	end
+
+	local function tweenToPosition(targetPos, facePos, monster)
 		local character, humanoid, hrp = getCharacterParts()
 
+		if humanoid.Health <= 0 then
+			return false
+		end
+
 		local distance = (targetPos - hrp.Position).Magnitude
-		if distance < 1 then
+		if distance <= 1 then
 			lookAtTarget(hrp, facePos)
 			return true
 		end
 
-		humanoid:MoveTo(targetPos)
+		cancelActiveTween()
+
+		local duration = math.max(distance / MOVE_SPEED, 0.05)
+		local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Linear)
+		local tween = TweenService:Create(hrp, tweenInfo, {
+			CFrame = CFrame.lookAt(targetPos, Vector3.new(facePos.X, targetPos.Y, facePos.Z))
+		})
+
+		activeTween = tween
+		tween:Play()
 
 		local reached = false
-		local done = false
-		local conn
-
-		conn = humanoid.MoveToFinished:Connect(function(ok)
-			reached = ok
-			done = true
-		end)
-
 		local startTime = tick()
 
-		while getgenv().RobloxUIRunning and not done do
+		while getgenv().RobloxUIRunning do
 			if not State.autoMonsterFarm or State.autoMiner then
 				break
 			end
@@ -203,25 +220,40 @@ function AutoMonster.run(State)
 				break
 			end
 
-			local distNow = (targetPos - hrp.Position).Magnitude
-			if distNow <= 3 then
-				reached = true
-				done = true
+			if not monster or not monster.Parent then
 				break
 			end
 
-			if tick() - startTime >= MOVE_TIMEOUT then
+			local monsterHumanoid = findMonsterHumanoid(monster)
+			local monsterRoot = findMonsterRoot(monster)
+			if not monsterHumanoid or not monsterRoot or monsterHumanoid.Health <= 0 then
+				break
+			end
+
+			local distNow = (targetPos - hrp.Position).Magnitude
+			if distNow <= 3 then
+				reached = true
+				break
+			end
+
+			lookAtTarget(hrp, monsterRoot.Position)
+
+			if tick() - startTime > duration + 0.5 then
 				break
 			end
 
 			task.wait(0.05)
 		end
 
-		if conn then
-			conn:Disconnect()
+		cancelActiveTween()
+
+		if monster and monster.Parent then
+			local monsterRoot = findMonsterRoot(monster)
+			if monsterRoot then
+				lookAtTarget(hrp, monsterRoot.Position)
+			end
 		end
 
-		lookAtTarget(hrp, facePos)
 		return reached
 	end
 
@@ -256,28 +288,17 @@ function AutoMonster.run(State)
 		return nearestMonster
 	end
 
-	local function snapToGroundNearCurrentPosition()
-		local character, humanoid, hrp = getCharacterParts()
-
-		local groundY = getGroundY(hrp.Position.X, hrp.Position.Z, { character })
-		if not groundY then
-			return
-		end
-
-		local offset = getCharacterGroundOffset(character)
-		local fixedPos = Vector3.new(hrp.Position.X, groundY + offset, hrp.Position.Z)
-
-		hrp.CFrame = CFrame.lookAt(
-			fixedPos,
-			fixedPos + hrp.CFrame.LookVector
-		)
-	end
-
 	local function followAndAttack(monster)
 		local _, humanoid, hrp = getCharacterParts()
 
-		while getgenv().RobloxUIRunning and State.autoMonsterFarm and monster and monster.Parent do
+		while getgenv().RobloxUIRunning and State.autoMonsterFarm do
 			if State.autoMiner then
+				cancelActiveTween()
+				return
+			end
+
+			if not monster or not monster.Parent then
+				cancelActiveTween()
 				return
 			end
 
@@ -285,10 +306,12 @@ function AutoMonster.run(State)
 			local monsterRoot = findMonsterRoot(monster)
 
 			if not monsterHumanoid or not monsterRoot then
+				cancelActiveTween()
 				return
 			end
 
 			if monsterHumanoid.Health <= 0 then
+				cancelActiveTween()
 				return
 			end
 
@@ -296,20 +319,20 @@ function AutoMonster.run(State)
 			local monsterPos = monsterRoot.Position
 			local horizontalDist = getHorizontalDistance(currentPos, monsterPos)
 
-			local standPos = getStandPosition(currentPos, monsterPos, monster)
-
 			if horizontalDist > ATTACK_RANGE then
+				local standPos = getStandPosition(currentPos, monsterPos, monster)
+
 				if (standPos - currentPos).Magnitude > REPOSITION_DISTANCE then
-					moveToPosition(standPos, monsterPos)
+					tweenToPosition(standPos, monsterPos, monster)
 				else
 					lookAtTarget(hrp, monsterPos)
 					task.wait(0.05)
 				end
 			else
-				-- snapToGroundNearCurrentPosition()
+				cancelActiveTween()
 				lookAtTarget(hrp, monsterPos)
 				attack()
-				task.wait(0.15)
+				task.wait(ATTACK_INTERVAL)
 			end
 
 			local character = player.Character
@@ -317,27 +340,34 @@ function AutoMonster.run(State)
 				_, humanoid, hrp = getCharacterParts()
 			end
 		end
+
+		cancelActiveTween()
 	end
 
 	task.spawn(function()
 		while getgenv().RobloxUIRunning do
 			if not State.autoMonsterFarm then
+				cancelActiveTween()
 				task.wait(0.2)
 				continue
 			end
 
 			if not hasAnySelectedMonster() then
+				cancelActiveTween()
 				task.wait(0.5)
 				continue
 			end
 
-			local target = findTargetMonster()
+			local target = findTargetMonster() -- หาตัวที่ใกล้สุดเสมอ
 			if target then
 				followAndAttack(target)
 			else
-				task.wait(0.5)
+				cancelActiveTween()
+				task.wait(0.3)
 			end
 		end
+
+		cancelActiveTween()
 	end)
 end
 
