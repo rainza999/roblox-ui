@@ -981,7 +981,7 @@ function AutoMiner.run(State)
                 task.wait(0.2)
             end
 		else
-			warn("No selected mineral found")
+			warn("No selected mineral found v.1")
 			task.wait(0.5)
 		end
 	end
