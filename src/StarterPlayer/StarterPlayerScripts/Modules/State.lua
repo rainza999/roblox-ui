@@ -87,6 +87,9 @@ local State = {
 		"Samurai Ape",
 		"Savage Ape",
 		"Mountain Ape",
+
+		"Chuthlu",
+		"Skeleton Pirate",
 		
 		"Elite Orc",
 		"Yeti",

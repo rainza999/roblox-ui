@@ -3,8 +3,17 @@ local AutoMonster = {}
 function AutoMonster.run(State)
 	local Players = game:GetService("Players")
 	local ReplicatedStorage = game:GetService("ReplicatedStorage")
+	local TweenService = game:GetService("TweenService")
+	local Workspace = game:GetService("Workspace")
 
 	local player = Players.LocalPlayer
+	local activeTween = nil
+
+	local FLOAT_HEIGHT = 12 -- ลอยสูงจากตำแหน่งมอน/ผิวน้ำประมาณนี้
+	local ATTACK_RANGE = 7
+	local STOP_DISTANCE = 4
+	local TWEEN_REPOSITION_DISTANCE = 3
+	local MOVE_SPEED = 65
 
 	local function getCharacterParts()
 		local character = player.Character or player.CharacterAdded:Wait()
@@ -50,7 +59,6 @@ function AutoMonster.run(State)
 	end
 
 	local function getRealMonsterName(model)
-		-- ลองหา StringValue/Configuration ที่เก็บชื่อจริง
 		for _, obj in ipairs(model:GetDescendants()) do
 			if obj:IsA("StringValue") then
 				local n = string.lower(obj.Name)
@@ -62,7 +70,6 @@ function AutoMonster.run(State)
 			end
 		end
 
-		-- ลองหา model ลูกที่ชื่อเป็นชื่อมอนจริง
 		for _, child in ipairs(model:GetChildren()) do
 			if child:IsA("Model") then
 				local hum = child:FindFirstChildOfClass("Humanoid")
@@ -72,7 +79,6 @@ function AutoMonster.run(State)
 			end
 		end
 
-		-- fallback: ตัดเลขท้ายชื่อออก เช่น Common Orc17 -> Common Orc
 		local cleaned = model.Name:gsub("%d+$", "")
 		cleaned = cleaned:gsub("%s+$", "")
 		return cleaned
@@ -97,6 +103,59 @@ function AutoMonster.run(State)
 			or model:FindFirstChildWhichIsA("Humanoid", true)
 	end
 
+	local function getHorizontalDistance(a, b)
+		local dx = a.X - b.X
+		local dz = a.Z - b.Z
+		return math.sqrt(dx * dx + dz * dz)
+	end
+
+	local function getFloatPosition(targetPos, height)
+		return Vector3.new(targetPos.X, targetPos.Y + height, targetPos.Z)
+	end
+
+	local function tweenLookAt(hrp, facePos)
+		local targetCF = CFrame.lookAt(
+			hrp.Position,
+			Vector3.new(facePos.X, hrp.Position.Y, facePos.Z)
+		)
+
+		local tween = TweenService:Create(
+			hrp,
+			TweenInfo.new(0.08, Enum.EasingStyle.Linear),
+			{ CFrame = targetCF }
+		)
+
+		tween:Play()
+		tween.Completed:Wait()
+	end
+
+	local function tweenToPosition(hrp, targetPos, facePos, speed)
+		if activeTween then
+			activeTween:Cancel()
+			activeTween = nil
+		end
+
+		local distance = (targetPos - hrp.Position).Magnitude
+		if distance < 0.5 then
+			tweenLookAt(hrp, facePos)
+			return
+		end
+
+		local tweenTime = math.max(distance / (speed or 55), 0.08)
+
+		activeTween = TweenService:Create(
+			hrp,
+			TweenInfo.new(tweenTime, Enum.EasingStyle.Linear, Enum.EasingDirection.Out),
+			{
+				CFrame = CFrame.lookAt(targetPos, Vector3.new(facePos.X, targetPos.Y, facePos.Z))
+			}
+		)
+
+		activeTween:Play()
+		activeTween.Completed:Wait()
+		activeTween = nil
+	end
+
 	local function findTargetMonster()
 		local living = workspace:FindFirstChild("Living")
 		if not living then
@@ -111,14 +170,13 @@ function AutoMonster.run(State)
 		for _, model in ipairs(living:GetChildren()) do
 			if model:IsA("Model") then
 				local realName = getRealMonsterName(model)
-				print("Living model:", model.Name, "=> real:", realName)
 
 				if isSelectedMonster(realName) then
 					local monsterHumanoid = findMonsterHumanoid(model)
 					local monsterRoot = findMonsterRoot(model)
 
 					if monsterHumanoid and monsterRoot and monsterHumanoid.Health > 0 then
-						local dist = (monsterRoot.Position - hrp.Position).Magnitude
+						local dist = getHorizontalDistance(monsterRoot.Position, hrp.Position)
 						if dist < nearestDistance then
 							nearestDistance = dist
 							nearestMonster = model
@@ -128,111 +186,78 @@ function AutoMonster.run(State)
 			end
 		end
 
-		if nearestMonster then
-			print("Target chosen:", nearestMonster.Name, "real:", getRealMonsterName(nearestMonster))
-		end
-
 		return nearestMonster
 	end
 
-    local TweenService = game:GetService("TweenService")
-
-    local activeTween = nil
-
-    local function tweenToPosition(hrp, targetPos, facePos, speed)
-        if activeTween then
-            activeTween:Cancel()
-            activeTween = nil
-        end
-
-        local distance = (targetPos - hrp.Position).Magnitude
-        if distance < 0.5 then
-            tweenLookAt(hrp, facePos)
-            return
-        end
-
-        local tweenTime = math.max(distance / (speed or 55), 0.08)
-
-        activeTween = TweenService:Create(
-            hrp,
-            TweenInfo.new(tweenTime, Enum.EasingStyle.Linear, Enum.EasingDirection.Out),
-            {
-                CFrame = CFrame.lookAt(targetPos, facePos)
-            }
-        )
-
-        activeTween:Play()
-        activeTween.Completed:Wait()
-        activeTween = nil
-    end
-
-    local function tweenLookAt(hrp, facePos)
-        local targetCF = CFrame.lookAt(
-            hrp.Position,
-            Vector3.new(facePos.X, hrp.Position.Y, facePos.Z)
-        )
-
-        local tween = TweenService:Create(
-            hrp,
-            TweenInfo.new(0.08, Enum.EasingStyle.Linear),
-            { CFrame = targetCF }
-        )
-
-        tween:Play()
-        tween.Completed:Wait()
-    end
-
 	local function followAndAttack(monster)
-        local _, humanoid, hrp = getCharacterParts()
+		local _, humanoid, hrp = getCharacterParts()
 
-        local ATTACK_RANGE = 7
-        local STOP_DISTANCE = 4
-        local TWEEN_REPOSITION_DISTANCE = 3
-        local MOVE_SPEED = 65
+		while getgenv().RobloxUIRunning and State.autoMonsterFarm and monster and monster.Parent do
+			if State.autoMiner then
+				return
+			end
 
-        while getgenv().RobloxUIRunning and State.autoMonsterFarm and monster and monster.Parent do
-            if State.autoMiner then
-                return
-            end
+			local monsterHumanoid = findMonsterHumanoid(monster)
+			local monsterRoot = findMonsterRoot(monster)
 
-            local monsterHumanoid = findMonsterHumanoid(monster)
-            local monsterRoot = findMonsterRoot(monster)
+			if not monsterHumanoid or not monsterRoot then
+				return
+			end
 
-            if not monsterHumanoid or not monsterRoot then
-                return
-            end
+			if monsterHumanoid.Health <= 0 then
+				return
+			end
 
-            if monsterHumanoid.Health <= 0 then
-                return
-            end
+			local monsterPos = monsterRoot.Position
+			local currentPos = hrp.Position
 
-            local offset = monsterRoot.Position - hrp.Position
-            local dist = offset.Magnitude
+			-- ใช้ระยะแนวราบแทน จะได้ไม่งงเพราะเราลอยอยู่สูง
+			local horizontalDist = getHorizontalDistance(monsterPos, currentPos)
 
-            if dist > ATTACK_RANGE then
-                local dir = offset.Unit
-                local standPos = monsterRoot.Position - (dir * STOP_DISTANCE)
+			if horizontalDist > ATTACK_RANGE then
+				local flatDir = Vector3.new(
+					monsterPos.X - currentPos.X,
+					0,
+					monsterPos.Z - currentPos.Z
+				)
 
-                -- tween เข้าไปใกล้จุดยืนโจมตี
-                if (standPos - hrp.Position).Magnitude > TWEEN_REPOSITION_DISTANCE then
-                    tweenToPosition(hrp, standPos, monsterRoot.Position, MOVE_SPEED)
-                else
-                    tweenLookAt(hrp, monsterRoot.Position)
-                    task.wait(0.05)
-                end
-            else
-                -- อยู่ในระยะแล้ว ค่อยตี
-                tweenLookAt(hrp, monsterRoot.Position)
-                attack()
-                task.wait(0.15)
-            end
+				if flatDir.Magnitude > 0 then
+					flatDir = flatDir.Unit
+				else
+					flatDir = Vector3.new(0, 0, -1)
+				end
 
-            local character = player.Character
-            if not character or humanoid.Health <= 0 then
-                _, humanoid, hrp = getCharacterParts()
-            end
-        end
-    end
+				-- จุดยืนโจมตี: ถอยจากมอนนิดนึง แต่บังคับ Y ให้ลอย
+				local standFlat = Vector3.new(
+					monsterPos.X - (flatDir.X * STOP_DISTANCE),
+					monsterPos.Y + FLOAT_HEIGHT,
+					monsterPos.Z - (flatDir.Z * STOP_DISTANCE)
+				)
+
+				if (standFlat - currentPos).Magnitude > TWEEN_REPOSITION_DISTANCE then
+					tweenToPosition(hrp, standFlat, monsterPos, MOVE_SPEED)
+				else
+					tweenLookAt(hrp, monsterPos)
+					task.wait(0.05)
+				end
+			else
+				-- ถึงระยะตีแล้ว แต่ยังคงลอยไว้
+				local hoverPos = Vector3.new(currentPos.X, monsterPos.Y + FLOAT_HEIGHT, currentPos.Z)
+				if math.abs(currentPos.Y - hoverPos.Y) > 1 then
+					tweenToPosition(hrp, hoverPos, monsterPos, MOVE_SPEED)
+				else
+					tweenLookAt(hrp, monsterPos)
+					attack()
+					task.wait(0.15)
+				end
+			end
+
+			local character = player.Character
+			if not character or humanoid.Health <= 0 then
+				_, humanoid, hrp = getCharacterParts()
+			end
+		end
+	end
 
 	task.spawn(function()
 		while getgenv().RobloxUIRunning do
