@@ -36,9 +36,11 @@ local AutoAttackBoss = loadModule("AutoAttackBoss")
 local AutoMiner = loadModule("AutoMiner")
 local AutoMonster = loadModule("AutoMonster")
 local PotionManager = loadModule("PotionManager")
+local AutoNPC = loadModule("AutoNPC")
 
 PressT.start(State)
 PotionManager.run(State)
+AutoNPC.run(State)
 
 task.spawn(function()
 	AutoMiner.run(State)

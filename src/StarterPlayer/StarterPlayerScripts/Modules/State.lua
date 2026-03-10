@@ -14,8 +14,9 @@ local State = {
 	minerPotionEnabled = false,
 
 	autoMonsterFarm = false,
-
 	autoClearTrash = false,
+
+	autoNpcBusy = false,
 
 	isClearing = false,
 	clearStatusText = "",
@@ -71,13 +72,15 @@ local State = {
 		["Savage Ape"] = false,
 		["Mountain Ape"] = false,
 
+		["Chuthlu"] = false,
+		["Skeleton Pirate"] = false,
+
 		["Yeti"] = false,
 		["Common Orc"] = false,
 		["Elite Orc"] = false,
 	},
 
 	monsterPriority = {
-
 		"Hellflame Oni",
 		"Warlord Oni",
 		"Frostburn Oni",
@@ -90,15 +93,14 @@ local State = {
 
 		"Chuthlu",
 		"Skeleton Pirate",
-		
+
 		"Elite Orc",
 		"Yeti",
 		"Common Orc",
 	},
 
-	-- ตัวกลางคุมสิทธิ์
-	activeController = nil,   -- nil / "AutoMiner" / "AutoMonster"
-	activeReason = nil,       -- "mining" / "clearing" / "monster"
+	activeController = nil,
+	activeReason = nil,
 }
 
 return State

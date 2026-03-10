@@ -116,7 +116,7 @@ function UI.create(state)
 		return s
 	end
 
-	local expandedHeight = 950
+	local expandedHeight = 1010
 	local collapsedHeight = 48
 	local isCollapsed = false
 
@@ -169,6 +169,8 @@ function UI.create(state)
 	closeBtn.BorderSizePixel = 0
 	closeBtn.Parent = header
 	makeCorner(closeBtn, 8)
+
+
 
 	local refreshButtons
 	local statusLabel
@@ -598,6 +600,7 @@ function UI.create(state)
 
 	local minerPotionBtn = makeButton("Auto Miner Potion: OFF", 630)
 	local minerBuyBtn = makeButton("Auto Buy Miner: OFF", 690)
+	local mazeBtn = makeButton("Go Maze Merchant", 740)
 
 	-- local function refreshButtons()
 	refreshButtons = function()
@@ -660,8 +663,21 @@ function UI.create(state)
 			and Color3.fromRGB(40,140,70)
 			or Color3.fromRGB(60,60,60)
 			
+		if mazeBtn then
+			if state.autoNpcBusy then
+				mazeBtn.Text = "Go Maze Merchant: MOVING"
+				mazeBtn.BackgroundColor3 = Color3.fromRGB(220, 140, 40)
+			else
+				mazeBtn.Text = "Go Maze Merchant"
+				mazeBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+			end
+		end
+
 		if statusLabel then
-			if state.isClearing then
+			if state.autoNpcBusy then
+				statusLabel.Text = "Status: Moving to Maze Merchant..."
+				statusLabel.TextColor3 = Color3.fromRGB(255, 210, 120)
+			elseif state.isClearing then
 				statusLabel.Text = "Status: " .. (state.clearStatusText ~= "" and state.clearStatusText or "Clearing...")
 				statusLabel.TextColor3 = Color3.fromRGB(255, 210, 120)
 			else
@@ -681,6 +697,20 @@ function UI.create(state)
 		if state.autoMiner then
 			state.autoMonsterFarm = false
 		end
+		refreshButtons()
+	end)
+
+	mazeBtn.MouseButton1Click:Connect(function()
+		if state.autoNpcBusy then
+			return
+		end
+
+		if state.goToMazeMerchant then
+			state.goToMazeMerchant()
+		else
+			warn("state.goToMazeMerchant not found")
+		end
+
 		refreshButtons()
 	end)
 
