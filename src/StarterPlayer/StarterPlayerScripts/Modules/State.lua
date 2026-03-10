@@ -22,6 +22,9 @@ local State = {
 	clearStatusText = "",
 
 	selectedLocations = {
+		["2s"] = true,
+		["I4_HolyCave_03_1"] = true,
+		["I4_HolyCave_03_2"] = true,
 		["Island3CavePeakBarrier"] = false,
 		["Island3CavePeakEnd"] = false,
 		["Island3RedCave"] = false,
@@ -52,7 +55,7 @@ local State = {
 
 	clearLimits = {
 		["Blossom Boulder"] = 0,
-		["Glowy Rock"] = 0,
+		["Glowy Rock"] = 2,
 		["Floating Crystal"] = 0,
 		["Large Red Crystal"] = 0,
 		["Large Ice Crystal"] = 0,

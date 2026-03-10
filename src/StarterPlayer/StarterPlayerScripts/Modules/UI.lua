@@ -19,6 +19,9 @@ function UI.create(state)
 	screenGui.Parent = playerGui
 
 	local locationNames = {
+		"2s",
+		"I4_HolyCave_03_1",
+		"I4_HolyCave_03_2",
 		"Island3CavePeakBarrier",
 		"Island3CavePeakEnd",
 		"Island3RedCave",
