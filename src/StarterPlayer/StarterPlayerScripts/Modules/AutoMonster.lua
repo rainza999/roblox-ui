@@ -9,6 +9,7 @@ function AutoMonster.run(State)
 
 	local player = Players.LocalPlayer
 	local activeTween = nil
+	local noclipParts = {}
 
 	local ATTACK_RANGE = 10
 	local STOP_DISTANCE = 4
@@ -21,6 +22,28 @@ function AutoMonster.run(State)
 		return character, humanoid, hrp
 	end
 
+	local function setCharacterNoclip(enabled)
+		local character = player.Character or player.CharacterAdded:Wait()
+
+		for _, obj in ipairs(character:GetDescendants()) do
+			if obj:IsA("BasePart") then
+				if enabled then
+					if noclipParts[obj] == nil then
+						noclipParts[obj] = obj.CanCollide
+					end
+					obj.CanCollide = false
+				else
+					if noclipParts[obj] ~= nil then
+						obj.CanCollide = noclipParts[obj]
+						noclipParts[obj] = nil
+					else
+						obj.CanCollide = true
+					end
+				end
+			end
+		end
+	end
+
 	local function cancelTween()
 		if activeTween then
 			pcall(function()
@@ -28,6 +51,7 @@ function AutoMonster.run(State)
 			end)
 			activeTween = nil
 		end
+		setCharacterNoclip(false)
 	end
 
 	local function attack()
@@ -192,6 +216,11 @@ function AutoMonster.run(State)
 		local dist = (desiredPos - myPos).Magnitude
 
 		cancelTween()
+		setCharacterNoclip(true)
+
+		pcall(function()
+			humanoid:ChangeState(Enum.HumanoidStateType.Physics)
+		end)
 
 		local tween = TweenService:Create(
 			hrp,
@@ -205,17 +234,29 @@ function AutoMonster.run(State)
 		while tween.PlaybackState == Enum.PlaybackState.Playing do
 			if not getgenv().RobloxUIRunning or not State.autoMonsterFarm or State.autoMiner then
 				tween:Cancel()
+				setCharacterNoclip(false)
 				return false
 			end
 
 			if not targetPart or not targetPart.Parent then
 				tween:Cancel()
+				setCharacterNoclip(false)
 				return false
 			end
 
-			task.wait(0.05)
+			setCharacterNoclip(true)
+			task.wait(0.03)
 		end
 
+		setCharacterNoclip(false)
+
+		pcall(function()
+			if humanoid and humanoid.Parent then
+				humanoid:ChangeState(Enum.HumanoidStateType.Running)
+			end
+		end)
+
+		activeTween = nil
 		return true
 	end
 
