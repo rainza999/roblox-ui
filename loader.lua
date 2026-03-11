@@ -46,7 +46,7 @@ task.spawn(function()
 	AutoMiner.run(State)
 end)
 
-print("AutoMonster module =", AutoMonster)
+print("AutoMonster modul234e =", AutoMonster)
 print("AutoMonster.run =", AutoMonster and AutoMonster.run)
 
 task.spawn(function()
