@@ -16,7 +16,9 @@ function AutoMonster.run(State)
 	local SEARCH_DISTANCE = math.huge
 
 	local STAGING_POINT = Vector3.new(389, 138, 93)
-	local STAGING_RADIUS = 10
+	local STAGING_RADIUS = 8
+	local SAFE_FLY_HEIGHT = 160
+	local MOVE_SPEED = 70
 
 	--------------------------------------------------
 	-- CHARACTER
@@ -56,6 +58,69 @@ function AutoMonster.run(State)
 	end
 
 	--------------------------------------------------
+	-- FREEZE MOTION
+	--------------------------------------------------
+
+	local function zeroVelocity(hrp)
+		pcall(function()
+			hrp.Velocity = Vector3.zero
+		end)
+		pcall(function()
+			hrp.RotVelocity = Vector3.zero
+		end)
+		pcall(function()
+			hrp.AssemblyLinearVelocity = Vector3.zero
+		end)
+		pcall(function()
+			hrp.AssemblyAngularVelocity = Vector3.zero
+		end)
+	end
+
+	--------------------------------------------------
+	-- PREPARE CHARACTER FOR TWEEN
+	--------------------------------------------------
+
+	local function prepareCharacterForTween(humanoid, hrp)
+		setCharacterNoclip(true)
+		zeroVelocity(hrp)
+
+		pcall(function()
+			humanoid.AutoRotate = false
+		end)
+
+		pcall(function()
+			humanoid:ChangeState(Enum.HumanoidStateType.Physics)
+		end)
+
+		pcall(function()
+			humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
+			humanoid:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false)
+			humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, false)
+			humanoid:SetStateEnabled(Enum.HumanoidStateType.Freefall, false)
+		end)
+	end
+
+	local function restoreCharacterAfterTween(humanoid, hrp)
+		zeroVelocity(hrp)
+		setCharacterNoclip(false)
+
+		pcall(function()
+			humanoid.AutoRotate = true
+		end)
+
+		pcall(function()
+			humanoid:ChangeState(Enum.HumanoidStateType.Running)
+		end)
+
+		pcall(function()
+			humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, true)
+			humanoid:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, true)
+			humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
+			humanoid:SetStateEnabled(Enum.HumanoidStateType.Freefall, true)
+		end)
+	end
+
+	--------------------------------------------------
 	-- CANCEL TWEEN
 	--------------------------------------------------
 
@@ -67,7 +132,8 @@ function AutoMonster.run(State)
 			activeTween = nil
 		end
 
-		setCharacterNoclip(false)
+		local _, humanoid, hrp = getCharacterParts()
+		restoreCharacterAfterTween(humanoid, hrp)
 	end
 
 	--------------------------------------------------
@@ -97,8 +163,7 @@ function AutoMonster.run(State)
 		name = name:gsub("%d+$", "")
 		name = name:gsub("%s+$", "")
 		name = name:gsub("^%s+", "")
-		name = string.lower(name)
-		return name
+		return string.lower(name)
 	end
 
 	local function getRealMonsterName(model)
@@ -110,14 +175,11 @@ function AutoMonster.run(State)
 			return false
 		end
 
-		local normalizedReal = normalizeName(realName)
+		local n = normalizeName(realName)
 
 		for monsterName, selected in pairs(State.selectedMonsters) do
-			if selected then
-				local normalizedSelected = normalizeName(monsterName)
-				if normalizedSelected == normalizedReal then
-					return true
-				end
+			if selected and normalizeName(monsterName) == n then
+				return true
 			end
 		end
 
@@ -126,7 +188,6 @@ function AutoMonster.run(State)
 
 	local function isOrcMonster(name)
 		local n = normalizeName(name)
-
 		return string.find(n, "common orc", 1, true) ~= nil
 			or string.find(n, "elite orc", 1, true) ~= nil
 	end
@@ -137,27 +198,32 @@ function AutoMonster.run(State)
 
 	local function isAtStaging()
 		local _, _, hrp = getCharacterParts()
-		return (hrp.Position - STAGING_POINT).Magnitude <= STAGING_RADIUS
+		return (hrp.Position - STAGING_POINT).Magnitude < STAGING_RADIUS
 	end
 
-	local function tweenToPosition(targetPos, speed)
-		local character, humanoid, hrp = getCharacterParts()
+	--------------------------------------------------
+	-- SAFE TWEEN USING CFRAME
+	--------------------------------------------------
+
+	local function tweenHRPTo(targetPos, speed)
+		local _, humanoid, hrp = getCharacterParts()
 
 		cancelTween()
+		prepareCharacterForTween(humanoid, hrp)
 
-		setCharacterNoclip(true)
+		local startPos = hrp.Position
+		local dist = (targetPos - startPos).Magnitude
+		local duration = math.max(dist / (speed or MOVE_SPEED), 0.08)
 
-		pcall(function()
-			humanoid:ChangeState(Enum.HumanoidStateType.Physics)
-		end)
-
-		local dist = (targetPos - hrp.Position).Magnitude
-		local time = math.max(dist / (speed or 70), 0.08)
+		local lookAt = targetPos
+		if (lookAt - startPos).Magnitude < 0.01 then
+			lookAt = startPos + Vector3.new(0, 0, -1)
+		end
 
 		local tween = TweenService:Create(
 			hrp,
-			TweenInfo.new(time, Enum.EasingStyle.Linear),
-			{Position = targetPos}
+			TweenInfo.new(duration, Enum.EasingStyle.Linear),
+			{CFrame = CFrame.lookAt(targetPos, lookAt)}
 		)
 
 		activeTween = tween
@@ -170,21 +236,44 @@ function AutoMonster.run(State)
 			end
 
 			setCharacterNoclip(true)
+			zeroVelocity(hrp)
 			task.wait(0.03)
 		end
 
-		setCharacterNoclip(false)
-
-		pcall(function()
-			humanoid:ChangeState(Enum.HumanoidStateType.Running)
-		end)
-
 		activeTween = nil
+		restoreCharacterAfterTween(humanoid, hrp)
 	end
 
+	--------------------------------------------------
+	-- MOVE TO STAGING
+	-- ยกขึ้นก่อน แล้วค่อยบินไป
+	--------------------------------------------------
+
 	local function moveToStaging()
-		print("Moving to staging:", STAGING_POINT)
-		tweenToPosition(STAGING_POINT, 70)
+		local _, _, hrp = getCharacterParts()
+		local currentPos = hrp.Position
+
+		local riseY = math.max(currentPos.Y + 25, SAFE_FLY_HEIGHT)
+		local risePos = Vector3.new(currentPos.X, riseY, currentPos.Z)
+		local flyPos = Vector3.new(STAGING_POINT.X, riseY, STAGING_POINT.Z)
+		local dropPos = STAGING_POINT
+
+		print("MoveToStaging rise ->", risePos)
+		tweenHRPTo(risePos, 85)
+
+		if not getgenv().RobloxUIRunning or not State.autoMonsterFarm then
+			return
+		end
+
+		print("MoveToStaging fly ->", flyPos)
+		tweenHRPTo(flyPos, 95)
+
+		if not getgenv().RobloxUIRunning or not State.autoMonsterFarm then
+			return
+		end
+
+		print("MoveToStaging drop ->", dropPos)
+		tweenHRPTo(dropPos, 70)
 	end
 
 	--------------------------------------------------
@@ -221,7 +310,7 @@ function AutoMonster.run(State)
 	--------------------------------------------------
 
 	local function moveToTargetPart(targetPart, stopDistance)
-		local _, humanoid, hrp = getCharacterParts()
+		local _, _, hrp = getCharacterParts()
 
 		if not targetPart or not targetPart.Parent then
 			return false
@@ -243,52 +332,12 @@ function AutoMonster.run(State)
 		flatDir = flatDir.Unit
 
 		local desiredPos = Vector3.new(
-			targetPos.X - flatDir.X * (stopDistance or 4),
+			targetPos.X - flatDir.X * (stopDistance or STOP_DISTANCE),
 			myPos.Y,
-			targetPos.Z - flatDir.Z * (stopDistance or 4)
+			targetPos.Z - flatDir.Z * (stopDistance or STOP_DISTANCE)
 		)
 
-		cancelTween()
-		setCharacterNoclip(true)
-
-		pcall(function()
-			humanoid:ChangeState(Enum.HumanoidStateType.Physics)
-		end)
-
-		local dist = (desiredPos - myPos).Magnitude
-		local tween = TweenService:Create(
-			hrp,
-			TweenInfo.new(math.max(dist / 60, 0.05), Enum.EasingStyle.Linear),
-			{Position = desiredPos}
-		)
-
-		activeTween = tween
-		tween:Play()
-
-		while tween.PlaybackState == Enum.PlaybackState.Playing do
-			if not getgenv().RobloxUIRunning or not State.autoMonsterFarm then
-				tween:Cancel()
-				setCharacterNoclip(false)
-				return false
-			end
-
-			if not targetPart.Parent then
-				tween:Cancel()
-				setCharacterNoclip(false)
-				return false
-			end
-
-			setCharacterNoclip(true)
-			task.wait(0.03)
-		end
-
-		setCharacterNoclip(false)
-
-		pcall(function()
-			humanoid:ChangeState(Enum.HumanoidStateType.Running)
-		end)
-
-		activeTween = nil
+		tweenHRPTo(desiredPos, 65)
 		return true
 	end
 
@@ -303,7 +352,6 @@ function AutoMonster.run(State)
 		end
 
 		local _, _, hrp = getCharacterParts()
-
 		local nearestMonster = nil
 		local nearestDistance = SEARCH_DISTANCE
 
@@ -313,7 +361,6 @@ function AutoMonster.run(State)
 
 				if isSelectedMonster(realName) and isMonsterAlive(mob) then
 					local part = findMonsterRoot(mob)
-
 					if part then
 						local dist = (part.Position - hrp.Position).Magnitude
 						if dist < nearestDistance then
@@ -337,7 +384,7 @@ function AutoMonster.run(State)
 		local requiresStaging = isOrcMonster(monsterName)
 
 		if requiresStaging and not isAtStaging() then
-			print("Target is orc, go staging first:", monsterName)
+			print("Orc target detected, going staging first:", monsterName)
 			moveToStaging()
 		end
 
@@ -371,23 +418,6 @@ function AutoMonster.run(State)
 	end
 
 	--------------------------------------------------
-	-- DEBUG SELECTED
-	--------------------------------------------------
-
-	local function debugSelectedMonsters()
-		if not State.selectedMonsters then
-			print("selectedMonsters = nil")
-			return
-		end
-
-		for k, v in pairs(State.selectedMonsters) do
-			print("SelectedMonster:", tostring(k), v and "true" or "false")
-		end
-	end
-
-	debugSelectedMonsters()
-
-	--------------------------------------------------
 	-- MAIN LOOP
 	--------------------------------------------------
 
@@ -403,15 +433,11 @@ function AutoMonster.run(State)
 
 			if monster then
 				print("Found target:", monster.Name)
-
 				attackMonster(monster)
 			else
-				print("No target found")
-
 				if not isAtStaging() then
 					moveToStaging()
 				end
-
 				task.wait(0.5)
 			end
 		end
