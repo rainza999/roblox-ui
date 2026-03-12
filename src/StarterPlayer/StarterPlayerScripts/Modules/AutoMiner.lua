@@ -397,13 +397,13 @@ function AutoMiner.run(State)
                 local oreName = obj:GetAttribute("Ore")
 
                 if oreName then
-                    print("[AutoMiner] Ore spawned:", oreName)
+                    -- print("[AutoMiner] Ore spawned:", oreName)
 
                     if State.selectedOres and State.selectedOres[oreName] then
-                        print("[AutoMiner] Ore matched:", oreName)
+                        -- print("[AutoMiner] Ore matched:", oreName)
                         return true, oreName
                     else
-                        print("[AutoMiner] Ore not selected:", oreName)
+                        -- print("[AutoMiner] Ore not selected:", oreName)
                     end
                 end
             end
@@ -498,7 +498,7 @@ function AutoMiner.run(State)
 		local oreModels = getOreModels(mineral)
 
 		if #oreModels == 0 then
-			print("[AutoMiner] Mineral has no ore yet -> allowed:", mineral.Name)
+			-- print("[AutoMiner] Mineral has no ore yet -> allowed:", mineral.Name)
 			return false
 		end
 
