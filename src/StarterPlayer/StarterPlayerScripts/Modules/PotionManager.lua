@@ -32,34 +32,38 @@ function PotionManager.run(State)
 	local POTIONS = {
 		LuckPotion1 = {
 			name = "LuckPotion1",
-			maxStacks = 12,
 			durationPerUse = 300,
+			maxStacks = 12,
 			targetStock = 10,
 			buyCooldown = 2,
-			useCooldown = 4,
+			useCooldown = 0.8,
+			rebuffWhenRemainAtOrBelow = 240,
+			buyPolicy = "maintain", -- ใช้แล้วซื้อคืนให้ stock = 10
 		},
 		MinerPotion1 = {
 			name = "MinerPotion1",
-			maxStacks = 3,
 			durationPerUse = 300,
+			maxStacks = 3,
 			targetStock = 10,
 			buyCooldown = 2,
-			useCooldown = 4,
+			useCooldown = 0.8,
+			rebuffWhenRemainAtOrBelow = 240,
+			buyPolicy = "empty", -- ซื้อใหม่เมื่อของในกระเป๋าหมดเท่านั้น
 		},
 	}
 
 	local potionState = {
 		LuckPotion1 = {
-			expiresAt = 0,
 			lastUseAt = 0,
 			lastBuyAt = 0,
 			lastActionAt = 0,
+			refillMode = false,
 		},
 		MinerPotion1 = {
-			expiresAt = 0,
 			lastUseAt = 0,
 			lastBuyAt = 0,
 			lastActionAt = 0,
+			refillMode = false,
 		},
 	}
 
@@ -360,6 +364,104 @@ function PotionManager.run(State)
 		return 1
 	end
 
+	local function parseDurationText(text)
+		if not text or text == "" then
+			return 0
+		end
+
+		text = tostring(text):gsub("%s+", "")
+
+		local h, m, s = string.match(text, "^(%d+):(%d+):(%d+)$")
+		if h and m and s then
+			return tonumber(h) * 3600 + tonumber(m) * 60 + tonumber(s)
+		end
+
+		local mm, ss = string.match(text, "^(%d+):(%d+)$")
+		if mm and ss then
+			return tonumber(mm) * 60 + tonumber(ss)
+		end
+
+		local onlyNumber = tonumber(text)
+		if onlyNumber then
+			return math.max(0, onlyNumber)
+		end
+
+		return 0
+	end
+
+	local function getPotionBuffSeconds(toolName)
+		local playerGui = player:FindFirstChild("PlayerGui")
+		if not playerGui then
+			return 0
+		end
+
+		local hotbar = playerGui:FindFirstChild("Hotbar")
+		if not hotbar then
+			return 0
+		end
+
+		local perks = hotbar:FindFirstChild("Perks")
+		if not perks then
+			return 0
+		end
+
+		local potionGui = perks:FindFirstChild(toolName)
+		if not potionGui then
+			return 0
+		end
+
+		local duration = potionGui:FindFirstChild("Duration")
+		if not duration then
+			return 0
+		end
+
+		local ok, value = pcall(function()
+			return duration.Text
+		end)
+
+		if not ok then
+			return 0
+		end
+
+		return parseDurationText(value)
+	end
+
+	local function getRemainingSeconds(toolName)
+		return math.max(0, getPotionBuffSeconds(toolName))
+	end
+
+	local function getRemainingStacks(toolName)
+		local cfg = POTIONS[toolName]
+		if not cfg then
+			return 0
+		end
+
+		local remain = getRemainingSeconds(toolName)
+		if remain <= 0 then
+			return 0
+		end
+
+		local stacks = math.ceil(remain / cfg.durationPerUse)
+		if stacks > cfg.maxStacks then
+			stacks = cfg.maxStacks
+		end
+
+		return stacks
+	end
+
+	local function getMissingStacks(toolName)
+		local cfg = POTIONS[toolName]
+		if not cfg then
+			return 0
+		end
+
+		local missing = cfg.maxStacks - getRemainingStacks(toolName)
+		if missing < 0 then
+			missing = 0
+		end
+		return missing
+	end
+
 	local function buyPotion(toolName, amount)
 		if amount <= 0 then
 			return false
@@ -392,78 +494,80 @@ function PotionManager.run(State)
 		end
 	end
 
-	local function getRemainingSeconds(toolName)
-		local st = potionState[toolName]
-		if not st then
-			return 0
+	local function shouldEnterRefillMode(toolName)
+		local cfg = POTIONS[toolName]
+		if not cfg then
+			return false
 		end
 
-		return math.max(0, st.expiresAt - now())
-	end
-
-	local function getRemainingStacks(toolName)
-		local cfg = POTIONS[toolName]
 		local remain = getRemainingSeconds(toolName)
-		if remain <= 0 then
-			return 0
+		local missing = getMissingStacks(toolName)
+
+		if remain <= cfg.rebuffWhenRemainAtOrBelow and missing > 0 then
+			return true
 		end
 
-		return math.floor((remain + 1) / cfg.durationPerUse)
+		return false
 	end
 
-	local function canUseMore(toolName)
-		local cfg = POTIONS[toolName]
-		local stacks = getRemainingStacks(toolName)
-		return stacks < cfg.maxStacks
-	end
-
-	local function registerUse(toolName)
-		local cfg = POTIONS[toolName]
+	local function updateRefillMode(toolName)
 		local st = potionState[toolName]
-		local t = now()
+		local count = findToolCount(toolName)
+		local missing = getMissingStacks(toolName)
 
-		if st.expiresAt < t then
-			st.expiresAt = t + cfg.durationPerUse
-		else
-			st.expiresAt += cfg.durationPerUse
+		if shouldEnterRefillMode(toolName) then
+			st.refillMode = true
 		end
 
-		local maxExpire = t + (cfg.maxStacks * cfg.durationPerUse)
-		if st.expiresAt > maxExpire then
-			st.expiresAt = maxExpire
+		if missing <= 0 then
+			st.refillMode = false
+			return
 		end
 
-		st.lastUseAt = t
-		st.lastActionAt = t
+		if count <= 0 and not shouldEnterRefillMode(toolName) then
+			st.refillMode = false
+		end
 	end
 
 	local function needBuy(toolName)
 		local cfg = POTIONS[toolName]
 		local st = potionState[toolName]
 		local count = findToolCount(toolName)
-		local need = cfg.targetStock - count
-
-		if need <= 0 then
-			return false, 0
-		end
 
 		if now() - st.lastBuyAt < cfg.buyCooldown then
 			return false, 0
 		end
 
-		return true, need
+		if cfg.buyPolicy == "maintain" then
+			local need = cfg.targetStock - count
+			if need > 0 then
+				return true, need
+			end
+			return false, 0
+		end
+
+		if cfg.buyPolicy == "empty" then
+			if count <= 0 then
+				return true, cfg.targetStock
+			end
+			return false, 0
+		end
+
+		return false, 0
 	end
 
 	local function needUse(toolName)
 		local cfg = POTIONS[toolName]
 		local st = potionState[toolName]
 		local count = findToolCount(toolName)
+		local missing = getMissingStacks(toolName)
 
-		if not canUseMore(toolName) then
+		if count <= 0 then
 			return false
 		end
 
-		if count <= 0 then
+		if missing <= 0 then
+			st.refillMode = false
 			return false
 		end
 
@@ -471,7 +575,13 @@ function PotionManager.run(State)
 			return false
 		end
 
-		return true
+		updateRefillMode(toolName)
+
+		if st.refillMode then
+			return true
+		end
+
+		return false
 	end
 
 	local function doBuy(toolName, amount)
@@ -515,17 +625,42 @@ function PotionManager.run(State)
 		local success = false
 
 		local ok, err = pcall(function()
+			local st = potionState[toolName]
+			local before = getRemainingSeconds(toolName)
+			local beforeStacks = getRemainingStacks(toolName)
+			local beforeBag = findToolCount(toolName)
+
 			local used = usePotion(toolName)
 			if used then
-				registerUse(toolName)
-				success = true
+				st.lastUseAt = now()
+				st.lastActionAt = now()
+
+				task.wait(0.2)
+
+				local after = getRemainingSeconds(toolName)
+				local afterStacks = getRemainingStacks(toolName)
+				local afterBag = findToolCount(toolName)
+				local missing = getMissingStacks(toolName)
+
+				if missing <= 0 then
+					st.refillMode = false
+				else
+					st.refillMode = true
+				end
+
 				print(
 					"[PotionBuff] used",
 					toolName,
-					"stacks=", getRemainingStacks(toolName),
-					"remain=", math.floor(getRemainingSeconds(toolName)),
-					"bag=", findToolCount(toolName)
+					"before=", math.floor(before),
+					"after=", math.floor(after),
+					"stacksBefore=", beforeStacks,
+					"stacksAfter=", afterStacks,
+					"bagBefore=", beforeBag,
+					"bagAfter=", afterBag,
+					"missing=", missing
 				)
+
+				success = true
 			end
 		end)
 
@@ -539,34 +674,59 @@ function PotionManager.run(State)
 		return success
 	end
 
+	local function processPotion(toolName, autoBuyFlag, autoUseFlag)
+		local cfg = POTIONS[toolName]
+		local st = potionState[toolName]
+
+		if not cfg then
+			return false
+		end
+
+		updateRefillMode(toolName)
+
+		local remain = getRemainingSeconds(toolName)
+		local stacks = getRemainingStacks(toolName)
+		local bag = findToolCount(toolName)
+		local missing = getMissingStacks(toolName)
+
+		if st.refillMode then
+			print(
+				"[PotionRefill]",
+				toolName,
+				"remain=", math.floor(remain),
+				"stacks=", stacks,
+				"bag=", bag,
+				"missing=", missing
+			)
+		end
+
+		-- 1) ถ้ากำลัง refill และมียาอยู่ ให้กดใช้ก่อน
+		if autoUseFlag and needUse(toolName) then
+			return doUse(toolName)
+		end
+
+		-- 2) ถ้าต้องซื้อค่อยซื้อ
+		if autoBuyFlag then
+			local shouldBuy, amount = needBuy(toolName)
+			if shouldBuy then
+				return doBuy(toolName, amount)
+			end
+		end
+
+		return false
+	end
+
 	local function runPotionStep()
 		if isPausedByOther("PotionManager") then
 			return
 		end
 
-		if State.autoBuyLuckPotion then
-			local shouldBuy, amount = needBuy("LuckPotion1")
-			if shouldBuy then
-				doBuy("LuckPotion1", amount)
-				return
-			end
-		end
-
-		if State.autoBuyMinerPotion then
-			local shouldBuy, amount = needBuy("MinerPotion1")
-			if shouldBuy then
-				doBuy("MinerPotion1", amount)
-				return
-			end
-		end
-
-		if State.autoUseLuckPotion and needUse("LuckPotion1") then
-			doUse("LuckPotion1")
+		-- Luck มาก่อน เพราะเป็นตัวที่ต้อง maintain stock ต่อเนื่อง
+		if processPotion("LuckPotion1", State.autoBuyLuckPotion, State.autoUseLuckPotion) then
 			return
 		end
 
-		if State.autoUseMinerPotion and needUse("MinerPotion1") then
-			doUse("MinerPotion1")
+		if processPotion("MinerPotion1", State.autoBuyMinerPotion, State.autoUseMinerPotion) then
 			return
 		end
 	end
@@ -596,16 +756,25 @@ function PotionManager.run(State)
 	end
 
 	PotionManager.usePotion = function(toolName)
-		if POTIONS[toolName] and not canUseMore(toolName) then
-			print("[PotionManager] Potion already full:", toolName)
+		local cfg = POTIONS[toolName]
+		if not cfg then
 			return false
 		end
+
+		local missing = getMissingStacks(toolName)
+		if missing <= 0 then
+			print("[PotionManager] Already full:", toolName)
+			return false
+		end
+
 		return doUse(toolName)
 	end
 
 	PotionManager.getRemainingSeconds = getRemainingSeconds
 	PotionManager.getRemainingStacks = getRemainingStacks
+	PotionManager.getMissingStacks = getMissingStacks
 	PotionManager.findToolCount = findToolCount
+	PotionManager.getPotionBuffSeconds = getPotionBuffSeconds
 
 	return PotionManager
 end
