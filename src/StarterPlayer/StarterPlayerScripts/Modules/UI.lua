@@ -31,6 +31,7 @@ function UI.create(state)
 		"Blossom Boulder",
 		"Glowy Rock",
 		"Floating Crystal",
+		"Heart Of The Island",
 		"Large Red Crystal",
 		"Large Ice Crystal",
 		"Medium Red Crystal",
