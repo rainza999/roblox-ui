@@ -603,6 +603,52 @@ function AutoMiner.run(State)
         return true
     end
 
+    local function stickToTargetPart(targetPart, stickDistance)
+		local character, humanoid, hrp = getCharacterParts()
+		if not targetPart or not targetPart.Parent then
+			return false
+		end
+
+		local targetPos = targetPart.Position
+		local myPos = hrp.Position
+		local dist = (targetPos - myPos).Magnitude
+		local desiredDistance = stickDistance or 2.2
+
+		-- ถ้าอยู่ใกล้อยู่แล้ว แค่หันหน้า
+		if dist <= desiredDistance + 0.35 then
+			faceTargetPart(targetPart)
+			return true
+		end
+
+		local flatDir = Vector3.new(
+			targetPos.X - myPos.X,
+			0,
+			targetPos.Z - myPos.Z
+		)
+
+		if flatDir.Magnitude <= 0.05 then
+			faceTargetPart(targetPart)
+			return true
+		end
+
+		flatDir = flatDir.Unit
+
+		-- ขยับให้ไปชิดแร่ แต่ยังไม่ทับจุดเดียวกันเป๊ะ
+		local desiredPos = Vector3.new(
+			targetPos.X - flatDir.X * desiredDistance,
+			myPos.Y,
+			targetPos.Z - flatDir.Z * desiredDistance
+		)
+
+		noclip(true)
+		hrp.CFrame = CFrame.lookAt(
+			desiredPos,
+			Vector3.new(targetPos.X, desiredPos.Y, targetPos.Z)
+		)
+
+		return true
+	end
+
 	local function attackMonster(monster)
         local timeout = tick() + 12
 
@@ -859,6 +905,7 @@ function AutoMiner.run(State)
 			handleNearbyMonster()
 
 			if not isMinerAlive(mineral) then
+                noclip(false)
 				return true
 			end
 
@@ -869,16 +916,20 @@ function AutoMiner.run(State)
 				return true
 			end
 
-			local dist = (targetPart.Position - hrp.Position).Magnitude
-			if dist > 12 then
+            local dist = (targetPart.Position - hrp.Position).Magnitude
+
+			-- ถ้าไกลมากค่อย tween เข้าไปก่อน
+			if dist > 6 then
 				moveToMiner(mineral)
 				targetPart = getMinerPart(mineral)
 				if not targetPart then
+					noclip(false)
 					return true
 				end
-            else
-                faceTargetPart(targetPart)
 			end
+
+			-- ระหว่างทุบให้เกาะแร่ตลอด
+			stickToTargetPart(targetPart, 2.2)
 
 			if oreMode then
 				local oreSpawned = hasAnyOreSpawned(mineral)
@@ -897,9 +948,10 @@ function AutoMiner.run(State)
 				return false
 			end
 
-            faceTargetPart(targetPart)
+            stickToTargetPart(targetPart, 2.2)
+			faceTargetPart(targetPart)
 			mining()
-			task.wait(0.15)
+			task.wait(0.12)
 
 			local currentHp = getMinerHealth(mineral)
 
@@ -917,6 +969,7 @@ function AutoMiner.run(State)
 			lastHp = currentHp
 
 			if not isMinerAlive(mineral) then
+                noclip(false)
 				return true
 			end
 
@@ -927,7 +980,7 @@ function AutoMiner.run(State)
 				end
 			end
 		end
-
+        noclip(false)
 		return false
 	end
 
@@ -957,6 +1010,7 @@ function AutoMiner.run(State)
 				print("[AutoMiner] Clear finished:", mineralName or mineral.Name)
 				State.isClearing = false
 				State.clearStatusText = ""
+                noclip(false)
 				return true
 			end
 
