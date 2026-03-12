@@ -64,6 +64,22 @@ function AutoMiner.run(State)
         return true
     end
 
+    -------------------------------------------------
+    -- Noclip
+    -------------------------------------------------
+
+    local function noclip(state)
+        local char = player.Character
+        if not char then return end
+
+        for _, v in pairs(char:GetDescendants()) do
+            if v:IsA("BasePart") then
+                v.CanCollide = not state
+            end
+        end
+    end
+
+
     local function setMode(mode)
         if currentMode == mode then
             return true
@@ -513,6 +529,8 @@ function AutoMiner.run(State)
             return false
         end
 
+        noclip(true)
+
         local targetPos = targetPart.Position
         local myPos = hrp.Position
 
@@ -542,22 +560,25 @@ function AutoMiner.run(State)
             TweenInfo.new(math.max(dist / 60, 0.05), Enum.EasingStyle.Linear),
             { CFrame = desiredCF }
         )
-
         tween:Play()
 
         while tween.PlaybackState == Enum.PlaybackState.Playing do
             if isPausedForAutoMiner() then
+                noclip(false)
                 tween:Cancel()
                 return false
             end
 
             if not targetPart or not targetPart.Parent then
+                noclip(false)
                 tween:Cancel()
                 return false
             end
 
             task.wait(0.05)
         end
+
+        noclip(false)
 
         return not isPausedForAutoMiner()
     end
