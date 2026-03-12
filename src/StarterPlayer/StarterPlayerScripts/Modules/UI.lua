@@ -44,6 +44,7 @@ function UI.create(state)
 		"Heavenly Orb",
 		"Lucky Cat",
 		"Heavenite",
+		"Heart Of The Island",
 		"Stolen Heart",
 		"Gargantuan",
 		"Duranite",
