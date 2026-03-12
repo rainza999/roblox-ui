@@ -892,7 +892,7 @@ function AutoMiner.run(State)
 	end
 
 	local function mineTarget(mineral)
-		local timeout = tick() + 45
+		local timeout = tick() + 60
 		local oreMode = hasAnySelectedOre()
 		local foundOreOnce = false
 		local lastHp = getMinerHealth(mineral)
