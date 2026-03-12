@@ -412,6 +412,80 @@ function AutoMiner.run(State)
         return false, nil
     end
 
+    local function getOreSummary(mineral)
+		local oreNames = {}
+		local matchedNames = {}
+		local total = 0
+
+		if not mineral or not mineral.Parent then
+			return 0, oreNames, false, matchedNames
+		end
+
+		for _, obj in ipairs(mineral:GetDescendants()) do
+			if obj:IsA("Model") and obj.Name == "Ore" then
+				local oreName = obj:GetAttribute("Ore")
+				if oreName and oreName ~= "" then
+					total += 1
+					table.insert(oreNames, oreName)
+
+					if State.selectedOres and State.selectedOres[oreName] then
+						table.insert(matchedNames, oreName)
+					end
+				end
+			end
+		end
+
+		local hasMatch = #matchedNames > 0
+		return total, oreNames, hasMatch, matchedNames
+	end
+
+	local function printOreSummary(mineral)
+		local total, oreNames, hasMatch, matchedNames = getOreSummary(mineral)
+
+		if total <= 0 then
+			print("[AutoMiner] 0 Ore")
+			return
+		end
+
+		local oreText = table.concat(oreNames, ", ")
+		local matchText = hasMatch and "YES" or "NO"
+
+		print(string.format(
+			"[AutoMiner] %d Ore (%s) | Match: %s",
+			total,
+			oreText,
+			matchText
+		))
+	end
+
+    local lastOreSummaryText = ""
+
+	local function printOreSummaryIfChanged(mineral)
+		local total, oreNames, hasMatch = getOreSummary(mineral)
+
+		local oreText = total > 0 and table.concat(oreNames, ", ") or ""
+		local matchText = hasMatch and "YES" or "NO"
+		local summary = string.format("%d|%s|%s", total, oreText, matchText)
+
+		if summary == lastOreSummaryText then
+			return
+		end
+
+		lastOreSummaryText = summary
+
+		if total <= 0 then
+			print("[AutoMiner] 0 Ore")
+			return
+		end
+
+		print(string.format(
+			"[AutoMiner] %d Ore (%s) | Match: %s",
+			total,
+			oreText,
+			matchText
+		))
+	end
+
     local function shouldSkipMineralBeforeMove(mineral)
 		if not hasAnySelectedOre() then
 			return false
@@ -647,6 +721,92 @@ function AutoMiner.run(State)
 		)
 
 		return true
+	end
+
+    -------------------------------------------------
+	-- Mineral Highlight
+	-------------------------------------------------
+
+	local previewHighlight = nil
+	local activeHighlight = nil
+	local currentPreviewMineral = nil
+	local currentActiveMineral = nil
+
+	local function clearHighlightInstance(h)
+		if h then
+			pcall(function()
+				h:Destroy()
+			end)
+		end
+	end
+
+	local function makeHighlight(target, fillColor, outlineColor, name)
+		if not target or not target.Parent then
+			return nil
+		end
+
+		local h = Instance.new("Highlight")
+		h.Name = name or "AutoMinerHighlight"
+		h.Adornee = target
+		h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+		h.FillTransparency = 0.8
+		h.OutlineTransparency = 0
+		h.FillColor = fillColor
+		h.OutlineColor = outlineColor
+		h.Parent = game:GetService("CoreGui")
+		return h
+	end
+
+	local function setPreviewMineral(mineral)
+		if currentPreviewMineral == mineral and previewHighlight then
+			return
+		end
+
+		clearHighlightInstance(previewHighlight)
+		previewHighlight = nil
+		currentPreviewMineral = nil
+
+		if mineral and mineral.Parent then
+			previewHighlight = makeHighlight(
+				mineral,
+				Color3.fromRGB(30, 144, 255),   -- fill ฟ้า
+				Color3.fromRGB(0, 102, 255),    -- outline น้ำเงิน
+				"AutoMinerPreviewHighlight"
+			)
+			currentPreviewMineral = mineral
+		end
+	end
+
+	local function setActiveMineral(mineral)
+		if currentActiveMineral == mineral and activeHighlight then
+			return
+		end
+
+		clearHighlightInstance(activeHighlight)
+		activeHighlight = nil
+		currentActiveMineral = nil
+
+		if mineral and mineral.Parent then
+			activeHighlight = makeHighlight(
+				mineral,
+				Color3.fromRGB(0, 255, 120),    -- fill เขียว
+				Color3.fromRGB(0, 200, 0),      -- outline เขียวเข้ม
+				"AutoMinerActiveHighlight"
+			)
+			currentActiveMineral = mineral
+		end
+	end
+
+	local function clearPreviewMineral()
+		clearHighlightInstance(previewHighlight)
+		previewHighlight = nil
+		currentPreviewMineral = nil
+	end
+
+	local function clearActiveMineral()
+		clearHighlightInstance(activeHighlight)
+		activeHighlight = nil
+		currentActiveMineral = nil
 	end
 
 	local function attackMonster(monster)
@@ -931,11 +1091,13 @@ function AutoMiner.run(State)
 			-- ระหว่างทุบให้เกาะแร่ตลอด
 			stickToTargetPart(targetPart, 2.2)
 
-			if oreMode then
+            if oreMode then
 				local oreSpawned = hasAnyOreSpawned(mineral)
 
 				if oreSpawned then
 					foundOreOnce = true
+
+					printOreSummaryIfChanged(mineral)
 
 					local matched = hasMatchingSelectedOre(mineral)
 					if not matched then
@@ -974,6 +1136,8 @@ function AutoMiner.run(State)
 			end
 
 			if oreMode and foundOreOnce then
+				printOreSummaryIfChanged(mineral)
+
 				local matched = hasMatchingSelectedOre(mineral)
 				if not matched then
 					return false
@@ -995,6 +1159,9 @@ function AutoMiner.run(State)
 		print("[AutoMiner] Clear target:", mineralName or mineral.Name, "| Location:", locationName)
 
 		moveToMiner(mineral)
+
+        clearPreviewMineral()
+		setActiveMineral(mineral)
 
 		local timeout = tick() + 20
 		while getgenv().RobloxUIRunning and State.autoClearTrash and mineral and mineral.Parent and tick() < timeout do
@@ -1086,14 +1253,24 @@ function AutoMiner.run(State)
 
 		local mineral, locationName = findMineral()
 
-		if mineral then
+        if mineral then
 			print("[AutoMiner] Found mineral:", mineral.Name, "| Location:", locationName)
-            print("[AutoMiner] Start mining:", mineral.Name)
+
+			setPreviewMineral(mineral)
+
+			print("[AutoMiner] Start mining:", mineral.Name)
 			moveToMiner(mineral)
 
+			clearPreviewMineral()
+			setActiveMineral(mineral)
+
+            lastOreSummaryText = ""
 			local finished = mineTarget(mineral)
 
             ControllerLock.release(State, "AutoMiner")
+
+            clearActiveMineral()
+			clearPreviewMineral()
 
             if isPausedForAutoMiner() then
                 task.wait(0.1)
