@@ -10,6 +10,8 @@ function AutoAttackBoss.run(State)
 	State.bossNextRunAt = State.bossNextRunAt or 0
 	State.autoNpcBusy = State.autoNpcBusy or false
 
+	print("State : ",State)
+	
 	local TweenService = game:GetService("TweenService")
 	local Players = game:GetService("Players")
 	local ReplicatedStorage = game:GetService("ReplicatedStorage")
