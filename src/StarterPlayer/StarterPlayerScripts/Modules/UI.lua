@@ -1,5 +1,6 @@
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
 
 local UI = {}
 
@@ -7,17 +8,14 @@ function UI.create(state)
 	local player = Players.LocalPlayer
 	local playerGui = player:WaitForChild("PlayerGui")
 
-	local oldGui = playerGui:FindFirstChild("ControlPanel V.4")
+	local oldGui = playerGui:FindFirstChild("ControlPanel V.6")
 	if oldGui then
 		oldGui:Destroy()
 	end
 
-	local screenGui = Instance.new("ScreenGui")
-	screenGui.Name = "ControlPanel V.4"
-	screenGui.ResetOnSpawn = false
-	screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-	screenGui.Parent = playerGui
-
+	-------------------------------------------------
+	-- Data
+	-------------------------------------------------
 	local locationNames = {
 		"2s",
 		"I4_HolyCave_03_1",
@@ -26,7 +24,7 @@ function UI.create(state)
 		"Island3CavePeakEnd",
 		"Island3RedCave",
 	}
-	
+
 	local mineralNames = {
 		"Blossom Boulder",
 		"Glowy Rock",
@@ -37,6 +35,7 @@ function UI.create(state)
 		"Medium Red Crystal",
 		"Medium Ice Crystal",
 		"Small Red Crystal",
+		"Small Ice Crystal",
 	}
 
 	local oreNames = {
@@ -55,7 +54,6 @@ function UI.create(state)
 	}
 
 	local monsterNames = {
-
 		"Hellflame Oni",
 		"Warlord Oni",
 		"Frostburn Oni",
@@ -105,15 +103,21 @@ function UI.create(state)
 		end
 	end
 
-	local function pointInGui(guiObject, x, y)
-		local pos = guiObject.AbsolutePosition
-		local size = guiObject.AbsoluteSize
-		return x >= pos.X and x <= pos.X + size.X and y >= pos.Y and y <= pos.Y + size.Y
-	end
+	-------------------------------------------------
+	-- GUI Root
+	-------------------------------------------------
+	local screenGui = Instance.new("ScreenGui")
+	screenGui.Name = "ControlPanel V.6"
+	screenGui.ResetOnSpawn = false
+	screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+	screenGui.Parent = playerGui
 
+	-------------------------------------------------
+	-- Helpers
+	-------------------------------------------------
 	local function makeCorner(parent, radius)
 		local c = Instance.new("UICorner")
-		c.CornerRadius = UDim.new(0, radius or 6)
+		c.CornerRadius = UDim.new(0, radius or 8)
 		c.Parent = parent
 		return c
 	end
@@ -127,134 +131,304 @@ function UI.create(state)
 		return s
 	end
 
-	local expandedHeight = 1010
-	local collapsedHeight = 48
+	local function makeGradient(parent, colorA, colorB, rotation)
+		local g = Instance.new("UIGradient")
+		g.Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, colorA),
+			ColorSequenceKeypoint.new(1, colorB),
+		})
+		g.Rotation = rotation or 90
+		g.Parent = parent
+		return g
+	end
+
+	local function pointInGui(guiObject, x, y)
+		local pos = guiObject.AbsolutePosition
+		local size = guiObject.AbsoluteSize
+		return x >= pos.X and x <= pos.X + size.X and y >= pos.Y and y <= pos.Y + size.Y
+	end
+
+	local function normalizeName(name)
+		name = tostring(name or "")
+		name = string.lower(name)
+		name = name:gsub("%d+$", "")
+		name = name:gsub("^%s+", "")
+		name = name:gsub("%s+$", "")
+		return name
+	end
+
+	local function getCharacterParts()
+		local character = player.Character or player.CharacterAdded:Wait()
+		local humanoid = character:FindFirstChild("Humanoid")
+		local hrp = character:FindFirstChild("HumanoidRootPart")
+		return character, humanoid, hrp
+	end
+
+	local function hasAliveMonster(monsterName)
+		local living = workspace:FindFirstChild("Living")
+		if not living then
+			return false
+		end
+
+		local target = normalizeName(monsterName)
+
+		for _, mob in ipairs(living:GetChildren()) do
+			if mob:IsA("Model") and normalizeName(mob.Name) == target then
+				local hum = mob:FindFirstChildOfClass("Humanoid") or mob:FindFirstChildWhichIsA("Humanoid", true)
+				if not hum or hum.Health > 0 then
+					return true
+				end
+			end
+		end
+
+		return false
+	end
+
+	local function hasAliveMineral(mineralName)
+		local rocks = workspace:FindFirstChild("Rocks")
+		if not rocks then
+			return false
+		end
+
+		local target = normalizeName(mineralName)
+
+		for _, mapFolder in ipairs(rocks:GetChildren()) do
+			for _, obj in ipairs(mapFolder:GetDescendants()) do
+				if normalizeName(obj.Name) == target then
+					local hpAttr = obj:GetAttribute("Health")
+					if type(hpAttr) == "number" then
+						if hpAttr > 0 then
+							return true
+						end
+					else
+						local hp = obj:FindFirstChild("Health")
+						if hp and (hp:IsA("NumberValue") or hp:IsA("IntValue")) then
+							if hp.Value > 0 then
+								return true
+							end
+						else
+							return true
+						end
+					end
+				end
+			end
+		end
+
+		return false
+	end
+
+	local function detectCurrentWorldName()
+		local hasSmallIceCrystal = hasAliveMineral("Small Ice Crystal")
+		local hasCrystalSpider = hasAliveMonster("Crystal Spider")
+
+		if hasSmallIceCrystal and hasCrystalSpider then
+			return "world3"
+		end
+
+		local hasGlowyRock = hasAliveMineral("Glowy Rock")
+		local hasBruteOni = hasAliveMonster("Brute Oni")
+
+		if hasGlowyRock and hasBruteOni then
+			return "world4"
+		end
+
+		return "unknown"
+	end
+
+	-------------------------------------------------
+	-- Window
+	-------------------------------------------------
+	local expandedSize = UDim2.new(0, 760, 0, 840)
+	local collapsedSize = UDim2.new(0, 760, 0, 58)
+	local maximizedSize = UDim2.new(1, -30, 1, -30)
+
 	local isCollapsed = false
+	local isMaximized = false
 
 	local frame = Instance.new("Frame")
-	frame.Size = UDim2.new(0, 340, 0, expandedHeight)
+	frame.Name = "MainFrame"
+	frame.Size = expandedSize
 	frame.AnchorPoint = Vector2.new(0.5, 0.5)
 	frame.Position = UDim2.new(0.5, 0, 0.5, 0)
-	frame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+	frame.BackgroundColor3 = Color3.fromRGB(23, 26, 34)
 	frame.BorderSizePixel = 0
 	frame.Parent = screenGui
-	makeCorner(frame, 10)
+	makeCorner(frame, 14)
+	makeStroke(frame, Color3.fromRGB(72, 82, 102), 1.2, 0.08)
+	makeGradient(frame, Color3.fromRGB(34, 39, 50), Color3.fromRGB(20, 23, 30), 90)
 
+	local storedPosition = frame.Position
+	local storedSize = frame.Size
+
+	-------------------------------------------------
+	-- Header
+	-------------------------------------------------
 	local header = Instance.new("Frame")
-	header.Size = UDim2.new(1, 0, 0, 46)
-	header.Position = UDim2.new(0, 0, 0, 0)
+	header.Size = UDim2.new(1, 0, 0, 52)
 	header.BackgroundTransparency = 1
 	header.Parent = frame
 
 	local title = Instance.new("TextLabel")
-	title.Size = UDim2.new(1, -90, 1, 0)
-	title.Position = UDim2.new(0, 12, 0, 0)
+	title.Size = UDim2.new(1, -140, 1, 0)
+	title.Position = UDim2.new(0, 14, 0, 0)
 	title.BackgroundTransparency = 1
-	title.Text = "Control Panel V.4"
+	title.Text = "Control Panel V.6"
 	title.Font = Enum.Font.GothamBold
-	title.TextColor3 = Color3.new(1, 1, 1)
-	title.TextSize = 18
+	title.TextSize = 20
+	title.TextColor3 = Color3.fromRGB(245, 247, 255)
 	title.TextXAlignment = Enum.TextXAlignment.Left
 	title.Parent = header
 
-	local collapseBtn = Instance.new("TextButton")
-	collapseBtn.Size = UDim2.new(0, 34, 0, 34)
-	collapseBtn.Position = UDim2.new(1, -78, 0, 6)
-	collapseBtn.Text = "—"
-	collapseBtn.Font = Enum.Font.GothamBold
-	collapseBtn.TextSize = 18
-	collapseBtn.TextColor3 = Color3.new(1, 1, 1)
-	collapseBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
-	collapseBtn.BorderSizePixel = 0
-	collapseBtn.Parent = header
-	makeCorner(collapseBtn, 8)
-
-	local closeBtn = Instance.new("TextButton")
-	closeBtn.Size = UDim2.new(0, 34, 0, 34)
-	closeBtn.Position = UDim2.new(1, -40, 0, 6)
-	closeBtn.Text = "X"
-	closeBtn.Font = Enum.Font.GothamBold
-	closeBtn.TextSize = 16
-	closeBtn.TextColor3 = Color3.new(1, 1, 1)
-	closeBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
-	closeBtn.BorderSizePixel = 0
-	closeBtn.Parent = header
-	makeCorner(closeBtn, 8)
-
-
-
-	local refreshButtons
-	local statusLabel
-
-	closeBtn.MouseButton1Click:Connect(function()
-		getgenv().RobloxUIRunning = false
-
-		state.autoBoss = false
-		state.autoMiner = false
-		state.autoPressT = false
-		state.autoDefend = false
-		state.autoMonsterFarm = false
-		state.autoClearTrash = false
-		state.isClearing = false
-		state.clearStatusText = "Stopped"
-		state.autoUseLuckPotion = false
-		state.autoBuyLuckPotion = false
-
-		state.autoUseMinerPotion = false
-		state.autoBuyMinerPotion = false
-		refreshButtons()
-
-		screenGui:Destroy()
-	end)
-
-	local content = Instance.new("Frame")
-	content.Name = "Content"
-	content.Size = UDim2.new(1, 0, 1, -46)
-	content.Position = UDim2.new(0, 0, 0, 46)
-	content.BackgroundTransparency = 1
-	content.ClipsDescendants = false
-	content.Parent = frame
-
-	local function makeButton(text, y)
+	local function createHeaderButton(text, xOffset, bgColor)
 		local btn = Instance.new("TextButton")
-		btn.Size = UDim2.new(1, -20, 0, 40)
-		btn.Position = UDim2.new(0, 10, 0, y)
+		btn.Size = UDim2.new(0, 34, 0, 34)
+		btn.Position = UDim2.new(1, xOffset, 0, 9)
+		btn.BackgroundColor3 = bgColor
+		btn.BorderSizePixel = 0
+		btn.Text = text
+		btn.Font = Enum.Font.GothamBold
+		btn.TextSize = 16
+		btn.TextColor3 = Color3.new(1, 1, 1)
+		btn.Parent = header
+		makeCorner(btn, 9)
+		makeStroke(btn, Color3.fromRGB(255, 255, 255), 1, 0.85)
+		return btn
+	end
+
+	local collapseBtn = createHeaderButton("—", -116, Color3.fromRGB(69, 93, 182))
+	local maxBtn = createHeaderButton("▢", -78, Color3.fromRGB(55, 138, 95))
+	local closeBtn = createHeaderButton("✕", -40, Color3.fromRGB(182, 63, 63))
+
+	local divider = Instance.new("Frame")
+	divider.Size = UDim2.new(1, -20, 0, 1)
+	divider.Position = UDim2.new(0, 10, 0, 52)
+	divider.BackgroundColor3 = Color3.fromRGB(60, 68, 84)
+	divider.BorderSizePixel = 0
+	divider.Parent = frame
+
+	-------------------------------------------------
+	-- Status Bar
+	-------------------------------------------------
+	local statusBar = Instance.new("Frame")
+	statusBar.Size = UDim2.new(1, -20, 0, 72)
+	statusBar.Position = UDim2.new(0, 10, 0, 62)
+	statusBar.BackgroundColor3 = Color3.fromRGB(28, 32, 41)
+	statusBar.BorderSizePixel = 0
+	statusBar.Parent = frame
+	makeCorner(statusBar, 12)
+	makeStroke(statusBar, Color3.fromRGB(76, 85, 102), 1, 0.12)
+
+	local worldTitle = Instance.new("TextLabel")
+	worldTitle.Size = UDim2.new(0, 100, 0, 18)
+	worldTitle.Position = UDim2.new(0, 14, 0, 10)
+	worldTitle.BackgroundTransparency = 1
+	worldTitle.Text = "Location"
+	worldTitle.Font = Enum.Font.GothamMedium
+	worldTitle.TextSize = 12
+	worldTitle.TextColor3 = Color3.fromRGB(168, 178, 196)
+	worldTitle.TextXAlignment = Enum.TextXAlignment.Left
+	worldTitle.Parent = statusBar
+
+	local worldValue = Instance.new("TextLabel")
+	worldValue.Size = UDim2.new(0.4, 0, 0, 26)
+	worldValue.Position = UDim2.new(0, 14, 0, 28)
+	worldValue.BackgroundTransparency = 1
+	worldValue.Text = "unknown"
+	worldValue.Font = Enum.Font.GothamBold
+	worldValue.TextSize = 18
+	worldValue.TextColor3 = Color3.fromRGB(240, 244, 255)
+	worldValue.TextXAlignment = Enum.TextXAlignment.Left
+	worldValue.Parent = statusBar
+
+	local statusTitle = Instance.new("TextLabel")
+	statusTitle.Size = UDim2.new(0, 100, 0, 18)
+	statusTitle.Position = UDim2.new(0.48, 0, 0, 10)
+	statusTitle.BackgroundTransparency = 1
+	statusTitle.Text = "Status"
+	statusTitle.Font = Enum.Font.GothamMedium
+	statusTitle.TextSize = 12
+	statusTitle.TextColor3 = Color3.fromRGB(168, 178, 196)
+	statusTitle.TextXAlignment = Enum.TextXAlignment.Left
+	statusTitle.Parent = statusBar
+
+	local statusValue = Instance.new("TextLabel")
+	statusValue.Size = UDim2.new(0.48, -14, 0, 26)
+	statusValue.Position = UDim2.new(0.48, 0, 0, 28)
+	statusValue.BackgroundTransparency = 1
+	statusValue.Text = "Idle"
+	statusValue.Font = Enum.Font.GothamBold
+	statusValue.TextSize = 16
+	statusValue.TextColor3 = Color3.fromRGB(240, 244, 255)
+	statusValue.TextXAlignment = Enum.TextXAlignment.Left
+	statusValue.Parent = statusBar
+
+	-------------------------------------------------
+	-- Content Area
+	-------------------------------------------------
+	local contentHolder = Instance.new("Frame")
+	contentHolder.Name = "ContentHolder"
+	contentHolder.Size = UDim2.new(1, -20, 1, -146)
+	contentHolder.Position = UDim2.new(0, 10, 0, 144)
+	contentHolder.BackgroundTransparency = 1
+	contentHolder.Parent = frame
+
+	local function makeButton(parent, text, height)
+		local btn = Instance.new("TextButton")
+		btn.Size = UDim2.new(1, 0, 0, height or 40)
+		btn.BackgroundColor3 = Color3.fromRGB(52, 58, 72)
+		btn.BorderSizePixel = 0
 		btn.Text = text
 		btn.Font = Enum.Font.GothamSemibold
 		btn.TextSize = 15
 		btn.TextColor3 = Color3.new(1, 1, 1)
-		btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-		btn.BorderSizePixel = 0
-		btn.Parent = content
-		makeCorner(btn, 8)
+		btn.Parent = parent
+		makeCorner(btn, 10)
+		makeStroke(btn, Color3.fromRGB(86, 96, 116), 1, 0.08)
 		return btn
 	end
 
-	local function createMultiSelect(names, selectedMap, y, placeholderText, dropdownHeight)
-		local selectWrap = Instance.new("Frame")
-		selectWrap.Size = UDim2.new(1, -20, 0, 46)
-		selectWrap.Position = UDim2.new(0, 10, 0, y)
-		selectWrap.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-		selectWrap.BorderSizePixel = 0
-		selectWrap.Parent = content
-		makeCorner(selectWrap, 8)
-		makeStroke(selectWrap, Color3.fromRGB(75, 75, 75), 1, 0)
+	local function createSection(parent, titleText)
+		local section = Instance.new("Frame")
+		section.AutomaticSize = Enum.AutomaticSize.Y
+		section.Size = UDim2.new(1, 0, 0, 10)
+		section.BackgroundColor3 = Color3.fromRGB(28, 32, 41)
+		section.BorderSizePixel = 0
+		section.Parent = parent
+		makeCorner(section, 12)
+		makeStroke(section, Color3.fromRGB(76, 85, 102), 1, 0.12)
 
-		local arrowLabel = Instance.new("TextLabel")
-		arrowLabel.Size = UDim2.new(0, 30, 1, 0)
-		arrowLabel.Position = UDim2.new(1, -30, 0, 0)
-		arrowLabel.BackgroundTransparency = 1
-		arrowLabel.Text = "▼"
-		arrowLabel.Font = Enum.Font.GothamBold
-		arrowLabel.TextSize = 14
-		arrowLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
-		arrowLabel.Parent = selectWrap
+		local pad = Instance.new("UIPadding")
+		pad.PaddingTop = UDim.new(0, 10)
+		pad.PaddingBottom = UDim.new(0, 10)
+		pad.PaddingLeft = UDim.new(0, 10)
+		pad.PaddingRight = UDim.new(0, 10)
+		pad.Parent = section
 
-		local openBtn = Instance.new("TextButton")
-		openBtn.Size = UDim2.new(1, 0, 1, 0)
-		openBtn.BackgroundTransparency = 1
-		openBtn.Text = ""
-		openBtn.Parent = selectWrap
+		local layout = Instance.new("UIListLayout")
+		layout.Padding = UDim.new(0, 8)
+		layout.Parent = section
+
+		local titleLabel = Instance.new("TextLabel")
+		titleLabel.Size = UDim2.new(1, 0, 0, 20)
+		titleLabel.BackgroundTransparency = 1
+		titleLabel.Text = titleText
+		titleLabel.Font = Enum.Font.GothamBold
+		titleLabel.TextSize = 14
+		titleLabel.TextColor3 = Color3.fromRGB(243, 246, 255)
+		titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+		titleLabel.Parent = section
+
+		return section
+	end
+
+	local function createMultiSelect(parent, names, selectedMap, placeholderText, dropdownHeight)
+		local wrap = Instance.new("Frame")
+		wrap.Size = UDim2.new(1, 0, 0, 46)
+		wrap.BackgroundColor3 = Color3.fromRGB(39, 43, 54)
+		wrap.BorderSizePixel = 0
+		wrap.Parent = parent
+		makeCorner(wrap, 10)
+		makeStroke(wrap, Color3.fromRGB(84, 94, 112), 1, 0.12)
 
 		local tagScroll = Instance.new("ScrollingFrame")
 		tagScroll.Size = UDim2.new(1, -38, 1, -8)
@@ -264,7 +438,7 @@ function UI.create(state)
 		tagScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
 		tagScroll.ScrollBarThickness = 3
 		tagScroll.ScrollingDirection = Enum.ScrollingDirection.X
-		tagScroll.Parent = selectWrap
+		tagScroll.Parent = wrap
 
 		local tagLayout = Instance.new("UIListLayout")
 		tagLayout.FillDirection = Enum.FillDirection.Horizontal
@@ -278,22 +452,35 @@ function UI.create(state)
 		placeholder.BackgroundTransparency = 1
 		placeholder.Text = placeholderText
 		placeholder.Font = Enum.Font.Gotham
-		placeholder.TextSize = 14
-		placeholder.TextColor3 = Color3.fromRGB(180, 180, 180)
+		placeholder.TextSize = 13
+		placeholder.TextColor3 = Color3.fromRGB(175, 184, 200)
 		placeholder.TextXAlignment = Enum.TextXAlignment.Left
 		placeholder.Parent = tagScroll
 
+		local arrowLabel = Instance.new("TextLabel")
+		arrowLabel.Size = UDim2.new(0, 28, 1, 0)
+		arrowLabel.Position = UDim2.new(1, -30, 0, 0)
+		arrowLabel.BackgroundTransparency = 1
+		arrowLabel.Text = "▼"
+		arrowLabel.Font = Enum.Font.GothamBold
+		arrowLabel.TextSize = 13
+		arrowLabel.TextColor3 = Color3.fromRGB(225, 232, 245)
+		arrowLabel.Parent = wrap
+
+		local openBtn = Instance.new("TextButton")
+		openBtn.Size = UDim2.new(1, 0, 1, 0)
+		openBtn.BackgroundTransparency = 1
+		openBtn.Text = ""
+		openBtn.Parent = wrap
+
 		local dropdown = Instance.new("Frame")
-		dropdown.Size = UDim2.new(1, -20, 0, 0)
-		dropdown.Position = UDim2.new(0, 10, 0, y + 51)
-		dropdown.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+		dropdown.Size = UDim2.new(1, 0, 0, 0)
+		dropdown.BackgroundColor3 = Color3.fromRGB(31, 35, 45)
 		dropdown.BorderSizePixel = 0
 		dropdown.ClipsDescendants = true
-		dropdown.Visible = true
-		dropdown.ZIndex = 20
-		dropdown.Parent = content
-		makeCorner(dropdown, 8)
-		makeStroke(dropdown, Color3.fromRGB(80, 80, 80), 1, 0)
+		dropdown.Parent = parent
+		makeCorner(dropdown, 10)
+		makeStroke(dropdown, Color3.fromRGB(84, 94, 112), 1, 0.12)
 
 		local searchBox = Instance.new("TextBox")
 		searchBox.Size = UDim2.new(1, -12, 0, 34)
@@ -302,14 +489,13 @@ function UI.create(state)
 		searchBox.Text = ""
 		searchBox.ClearTextOnFocus = false
 		searchBox.Font = Enum.Font.Gotham
-		searchBox.TextSize = 14
+		searchBox.TextSize = 13
 		searchBox.TextColor3 = Color3.new(1, 1, 1)
-		searchBox.PlaceholderColor3 = Color3.fromRGB(180, 180, 180)
-		searchBox.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
+		searchBox.PlaceholderColor3 = Color3.fromRGB(180, 188, 202)
+		searchBox.BackgroundColor3 = Color3.fromRGB(49, 54, 66)
 		searchBox.BorderSizePixel = 0
-		searchBox.ZIndex = 21
 		searchBox.Parent = dropdown
-		makeCorner(searchBox, 6)
+		makeCorner(searchBox, 8)
 
 		local listScroll = Instance.new("ScrollingFrame")
 		listScroll.Size = UDim2.new(1, -12, 1, -46)
@@ -318,7 +504,6 @@ function UI.create(state)
 		listScroll.BorderSizePixel = 0
 		listScroll.ScrollBarThickness = 4
 		listScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-		listScroll.ZIndex = 21
 		listScroll.Parent = dropdown
 
 		local listLayout = Instance.new("UIListLayout")
@@ -339,40 +524,35 @@ function UI.create(state)
 			return results
 		end
 
-		local function clearTags()
+		local function refreshTags()
 			for _, child in ipairs(tagScroll:GetChildren()) do
 				if child:IsA("Frame") then
 					child:Destroy()
 				end
 			end
-		end
-
-		local function refreshTags()
-			clearTags()
 
 			local selected = getSelectedNames()
 			placeholder.Visible = (#selected == 0)
 
 			for _, name in ipairs(selected) do
 				local tag = Instance.new("Frame")
-				tag.BackgroundColor3 = Color3.fromRGB(60, 100, 180)
+				tag.BackgroundColor3 = Color3.fromRGB(61, 96, 185)
 				tag.BorderSizePixel = 0
 				tag.AutomaticSize = Enum.AutomaticSize.X
-				tag.Size = UDim2.new(0, 0, 0, 28)
+				tag.Size = UDim2.new(0, 0, 0, 26)
 				tag.Parent = tagScroll
-				makeCorner(tag, 14)
+				makeCorner(tag, 13)
 
-				local innerPad = Instance.new("UIPadding")
-				innerPad.PaddingLeft = UDim.new(0, 10)
-				innerPad.PaddingRight = UDim.new(0, 8)
-				innerPad.Parent = tag
+				local tagPad = Instance.new("UIPadding")
+				tagPad.PaddingLeft = UDim.new(0, 10)
+				tagPad.PaddingRight = UDim.new(0, 8)
+				tagPad.Parent = tag
 
-				local tagLayoutInner = Instance.new("UIListLayout")
-				tagLayoutInner.FillDirection = Enum.FillDirection.Horizontal
-				tagLayoutInner.HorizontalAlignment = Enum.HorizontalAlignment.Left
-				tagLayoutInner.VerticalAlignment = Enum.VerticalAlignment.Center
-				tagLayoutInner.Padding = UDim.new(0, 6)
-				tagLayoutInner.Parent = tag
+				local innerLayout = Instance.new("UIListLayout")
+				innerLayout.FillDirection = Enum.FillDirection.Horizontal
+				innerLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+				innerLayout.Padding = UDim.new(0, 6)
+				innerLayout.Parent = tag
 
 				local tagLabel = Instance.new("TextLabel")
 				tagLabel.BackgroundTransparency = 1
@@ -380,16 +560,16 @@ function UI.create(state)
 				tagLabel.Size = UDim2.new(0, 0, 1, 0)
 				tagLabel.Text = name
 				tagLabel.Font = Enum.Font.GothamMedium
-				tagLabel.TextSize = 13
+				tagLabel.TextSize = 12
 				tagLabel.TextColor3 = Color3.new(1, 1, 1)
 				tagLabel.Parent = tag
 
 				local removeBtn = Instance.new("TextButton")
 				removeBtn.BackgroundTransparency = 1
-				removeBtn.Size = UDim2.new(0, 16, 0, 16)
+				removeBtn.Size = UDim2.new(0, 14, 0, 14)
 				removeBtn.Text = "×"
 				removeBtn.Font = Enum.Font.GothamBold
-				removeBtn.TextSize = 14
+				removeBtn.TextSize = 13
 				removeBtn.TextColor3 = Color3.new(1, 1, 1)
 				removeBtn.Parent = tag
 
@@ -397,7 +577,7 @@ function UI.create(state)
 					selectedMap[name] = false
 					if optionButtons[name] then
 						local btn = optionButtons[name]
-						btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+						btn.BackgroundColor3 = Color3.fromRGB(55, 60, 72)
 						local check = btn:FindFirstChild("CheckLabel")
 						if check then
 							check.Text = ""
@@ -408,8 +588,7 @@ function UI.create(state)
 			end
 
 			task.defer(function()
-				local contentWidth = tagLayout.AbsoluteContentSize.X
-				tagScroll.CanvasSize = UDim2.new(0, math.max(contentWidth + 10, tagScroll.AbsoluteSize.X), 0, 0)
+				tagScroll.CanvasSize = UDim2.new(0, math.max(tagLayout.AbsoluteContentSize.X + 10, tagScroll.AbsoluteSize.X), 0, 0)
 			end)
 		end
 
@@ -420,7 +599,7 @@ function UI.create(state)
 			end
 
 			local selected = selectedMap[name]
-			btn.BackgroundColor3 = selected and Color3.fromRGB(45, 120, 70) or Color3.fromRGB(60, 60, 60)
+			btn.BackgroundColor3 = selected and Color3.fromRGB(47, 122, 74) or Color3.fromRGB(55, 60, 72)
 
 			local check = btn:FindFirstChild("CheckLabel")
 			if check then
@@ -442,12 +621,11 @@ function UI.create(state)
 				if keyword == "" or string.find(string.lower(name), keyword, 1, true) then
 					local option = Instance.new("TextButton")
 					option.Size = UDim2.new(1, 0, 0, 34)
-					option.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+					option.BackgroundColor3 = Color3.fromRGB(55, 60, 72)
 					option.BorderSizePixel = 0
 					option.Text = ""
-					option.ZIndex = 21
 					option.Parent = listScroll
-					makeCorner(option, 6)
+					makeCorner(option, 8)
 
 					local checkLabel = Instance.new("TextLabel")
 					checkLabel.Name = "CheckLabel"
@@ -455,7 +633,7 @@ function UI.create(state)
 					checkLabel.Position = UDim2.new(0, 8, 0, 0)
 					checkLabel.BackgroundTransparency = 1
 					checkLabel.Font = Enum.Font.GothamBold
-					checkLabel.TextSize = 16
+					checkLabel.TextSize = 15
 					checkLabel.TextColor3 = Color3.new(1, 1, 1)
 					checkLabel.Parent = option
 
@@ -465,7 +643,7 @@ function UI.create(state)
 					label.BackgroundTransparency = 1
 					label.Text = name
 					label.Font = Enum.Font.Gotham
-					label.TextSize = 14
+					label.TextSize = 13
 					label.TextColor3 = Color3.new(1, 1, 1)
 					label.TextXAlignment = Enum.TextXAlignment.Left
 					label.Parent = option
@@ -493,7 +671,7 @@ function UI.create(state)
 			dropdownOpen = false
 			arrowLabel.Text = "▼"
 			dropdown:TweenSize(
-				UDim2.new(1, -20, 0, 0),
+				UDim2.new(1, 0, 0, 0),
 				Enum.EasingDirection.Out,
 				Enum.EasingStyle.Quad,
 				0.15,
@@ -513,7 +691,7 @@ function UI.create(state)
 			arrowLabel.Text = "▲"
 			rebuildOptions()
 			dropdown:TweenSize(
-				UDim2.new(1, -20, 0, dropdownHeight or 190),
+				UDim2.new(1, 0, 0, dropdownHeight or 190),
 				Enum.EasingDirection.Out,
 				Enum.EasingStyle.Quad,
 				0.15,
@@ -531,7 +709,7 @@ function UI.create(state)
 					local x = pos.X
 					local y = pos.Y
 
-					local insideSelect = pointInGui(selectWrap, x, y)
+					local insideSelect = pointInGui(wrap, x, y)
 					local insideDropdown = pointInGui(dropdown, x, y)
 
 					if not insideSelect and not insideDropdown then
@@ -561,59 +739,104 @@ function UI.create(state)
 		closeDropdown()
 
 		return {
-			selectWrap = selectWrap,
-			dropdown = dropdown,
-			refreshTags = refreshTags,
 			close = closeDropdown,
+			refreshTags = refreshTags,
+			wrap = wrap,
+			dropdown = dropdown,
 		}
 	end
 
-	local bossBtn = makeButton("Auto Boss: OFF", 10)
-	local tBtn = makeButton("Auto T: OFF", 60)
-	local minerBtn = makeButton("Auto Miner: OFF", 110)
-	local defendBtn = makeButton("Auto Defend: OFF", 160)
-	local clearBtn = makeButton("Auto Clear Trash: OFF", 210)
-	local monsterFarmBtn = makeButton("Auto Monster Farm: OFF", 260)
-	local locationSelect = createMultiSelect(
-		locationNames,
-		state.selectedLocations,
-		315,
-		"Select locations...",
-		190
-	)
+	-------------------------------------------------
+	-- Top Full Width Buttons
+	-------------------------------------------------
+	local topStack = Instance.new("Frame")
+	topStack.Size = UDim2.new(1, 0, 0, 92)
+	topStack.BackgroundTransparency = 1
+	topStack.Parent = contentHolder
 
-	local mineralSelect = createMultiSelect(
-		mineralNames,
-		state.selectedMinerals,
-		370,
-		"Select minerals...",
-		190
-	)
+	local topLayout = Instance.new("UIListLayout")
+	topLayout.Padding = UDim.new(0, 10)
+	topLayout.Parent = topStack
 
-	local oreSelect = createMultiSelect(
-		oreNames,
-		state.selectedOres,
-		425,
-		"Select ores...",
-		190
-	)
+	local bossBtn = makeButton(topStack, "Auto Boss: OFF", 40)
+	local tBtn = makeButton(topStack, "Auto T: OFF", 40)
 
-	local monsterSelect = createMultiSelect(
-		monsterNames,
-		state.selectedMonsters,
-		480,
-		"Select monsters...",
-		190
-	)
+	-------------------------------------------------
+	-- 2 Columns
+	-------------------------------------------------
+	local columns = Instance.new("Frame")
+	columns.Size = UDim2.new(1, 0, 1, -102)
+	columns.Position = UDim2.new(0, 0, 0, 102)
+	columns.BackgroundTransparency = 1
+	columns.Parent = contentHolder
 
-	local luckAutoBtn = makeButton("Auto Luck Potion: OFF", 530)
-	local luckBuyBtn = makeButton("Auto Buy Luck: OFF", 580)
+	local leftCol = Instance.new("Frame")
+	leftCol.Size = UDim2.new(0.5, -6, 1, 0)
+	leftCol.BackgroundTransparency = 1
+	leftCol.Parent = columns
 
-	local minerPotionBtn = makeButton("Auto Miner Potion: OFF", 630)
-	local minerBuyBtn = makeButton("Auto Buy Miner: OFF", 690)
-	local mazeBtn = makeButton("Go Maze Merchant", 740)
+	local rightCol = Instance.new("Frame")
+	rightCol.Size = UDim2.new(0.5, -6, 1, 0)
+	rightCol.Position = UDim2.new(0.5, 6, 0, 0)
+	rightCol.BackgroundTransparency = 1
+	rightCol.Parent = columns
 
-	-- local function refreshButtons()
+	local leftScroll = Instance.new("ScrollingFrame")
+	leftScroll.Size = UDim2.new(1, 0, 1, 0)
+	leftScroll.BackgroundTransparency = 1
+	leftScroll.BorderSizePixel = 0
+	leftScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	leftScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+	leftScroll.ScrollBarThickness = 4
+	leftScroll.Parent = leftCol
+
+	local rightScroll = Instance.new("ScrollingFrame")
+	rightScroll.Size = UDim2.new(1, 0, 1, 0)
+	rightScroll.BackgroundTransparency = 1
+	rightScroll.BorderSizePixel = 0
+	rightScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	rightScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+	rightScroll.ScrollBarThickness = 4
+	rightScroll.Parent = rightCol
+
+	local leftLayout = Instance.new("UIListLayout")
+	leftLayout.Padding = UDim.new(0, 10)
+	leftLayout.Parent = leftScroll
+
+	local rightLayout = Instance.new("UIListLayout")
+	rightLayout.Padding = UDim.new(0, 10)
+	rightLayout.Parent = rightScroll
+
+	-------------------------------------------------
+	-- Left: Auto Miner
+	-------------------------------------------------
+	local minerSection = createSection(leftScroll, "Auto Miner")
+	local minerBtn = makeButton(minerSection, "Auto Miner: OFF", 40)
+	local defendBtn = makeButton(minerSection, "Auto Defend: OFF", 40)
+	local clearBtn = makeButton(minerSection, "Auto Clear Trash: OFF", 40)
+	local locationSelect = createMultiSelect(minerSection, locationNames, state.selectedLocations, "Select locations...", 200)
+	local mineralSelect = createMultiSelect(minerSection, mineralNames, state.selectedMinerals, "Select minerals...", 220)
+	local oreSelect = createMultiSelect(minerSection, oreNames, state.selectedOres, "Select ores...", 220)
+
+	-------------------------------------------------
+	-- Right: Auto Monster + Potions
+	-------------------------------------------------
+	local monsterSection = createSection(rightScroll, "Auto Monster")
+	local monsterFarmBtn = makeButton(monsterSection, "Auto Monster Farm: OFF", 40)
+	local monsterSelect = createMultiSelect(monsterSection, monsterNames, state.selectedMonsters, "Select monsters...", 240)
+
+	local potionSection = createSection(rightScroll, "Potions & Utility")
+	local luckAutoBtn = makeButton(potionSection, "Auto Luck Potion: OFF", 40)
+	local luckBuyBtn = makeButton(potionSection, "Auto Buy Luck: OFF", 40)
+	local minerPotionBtn = makeButton(potionSection, "Auto Miner Potion: OFF", 40)
+	local minerBuyBtn = makeButton(potionSection, "Auto Buy Miner: OFF", 40)
+	local mazeBtn = makeButton(potionSection, "Go Maze Merchant", 40)
+
+	-------------------------------------------------
+	-- Refresh
+	-------------------------------------------------
+	local refreshButtons
+
 	refreshButtons = function()
 		local minerText = state.autoMiner and "ON" or "OFF"
 		local defendText = state.autoDefend and "ON" or "OFF"
@@ -624,88 +847,68 @@ function UI.create(state)
 			defendText = "WAIT"
 		end
 
-		bossBtn.Text = "Auto Boss: " .. (state.autoBoss and "ON" or "OFF")
-		bossBtn.BackgroundColor3 = state.autoBoss
-			and Color3.fromRGB(40, 140, 70)
-			or Color3.fromRGB(60, 60, 60)
-
-		minerBtn.Text = "Auto Miner: " .. minerText
-		minerBtn.BackgroundColor3 = state.autoMiner
-			and Color3.fromRGB(40, 140, 70)
-			or Color3.fromRGB(60, 60, 60)
-
-		tBtn.Text = "Auto T: " .. (state.autoPressT and "ON" or "OFF")
-		tBtn.BackgroundColor3 = state.autoPressT
-			and Color3.fromRGB(40, 140, 70)
-			or Color3.fromRGB(60, 60, 60)
-
-		defendBtn.Text = "Auto Defend: " .. defendText
-		defendBtn.BackgroundColor3 = state.autoDefend
-			and Color3.fromRGB(40, 140, 70)
-			or Color3.fromRGB(60, 60, 60)
-
-		clearBtn.Text = "Auto Clear Trash: " .. (state.autoClearTrash and "ON" or "OFF")
-		clearBtn.BackgroundColor3 = state.autoClearTrash
-			and Color3.fromRGB(40, 140, 70)
-			or Color3.fromRGB(60, 60, 60)
-
-		monsterFarmBtn.Text = "Auto Monster Farm: " .. monsterFarmText
-		monsterFarmBtn.BackgroundColor3 = state.autoMonsterFarm
-			and Color3.fromRGB(40, 140, 70)
-			or Color3.fromRGB(60, 60, 60)
-
-		luckAutoBtn.Text = "Auto Luck Potion: " .. (state.autoUseLuckPotion and "ON" or "OFF")
-		luckAutoBtn.BackgroundColor3 = state.autoUseLuckPotion
-			and Color3.fromRGB(40,140,70)
-			or Color3.fromRGB(60,60,60)
-
-		luckBuyBtn.Text = "Auto Buy Luck: " .. (state.autoBuyLuckPotion and "ON" or "OFF")
-		luckBuyBtn.BackgroundColor3 = state.autoBuyLuckPotion
-			and Color3.fromRGB(40,140,70)
-			or Color3.fromRGB(60,60,60)
-
-		minerPotionBtn.Text = "Auto Miner Potion: " .. (state.autoUseMinerPotion and "ON" or "OFF")
-		minerPotionBtn.BackgroundColor3 = state.autoUseMinerPotion
-			and Color3.fromRGB(40,140,70)
-			or Color3.fromRGB(60,60,60)
-
-		minerBuyBtn.Text = "Auto Buy Miner: " .. (state.autoBuyMinerPotion and "ON" or "OFF")
-		minerBuyBtn.BackgroundColor3 = state.autoBuyMinerPotion
-			and Color3.fromRGB(40,140,70)
-			or Color3.fromRGB(60,60,60)
-			
-		if mazeBtn then
-			if state.autoNpcBusy then
-				mazeBtn.Text = "Go Maze Merchant: MOVING"
-				mazeBtn.BackgroundColor3 = Color3.fromRGB(220, 140, 40)
-			else
-				mazeBtn.Text = "Go Maze Merchant"
-				mazeBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-			end
+		local function applyToggle(btn, enabled, text, onColor, offColor)
+			btn.Text = text
+			btn.BackgroundColor3 = enabled
+				and (onColor or Color3.fromRGB(45, 132, 82))
+				or (offColor or Color3.fromRGB(52, 58, 72))
 		end
 
-		if statusLabel then
-			if state.autoBoss and state.bossInProgress then
-				statusLabel.Text = "Status: Boss in progress..."
-				statusLabel.TextColor3 = Color3.fromRGB(255, 120, 120)
-			elseif state.autoBoss and state.bossPriorityActive then
-				statusLabel.Text = "Status: Waiting / switching to boss..."
-				statusLabel.TextColor3 = Color3.fromRGB(255, 170, 90)
-			elseif state.autoNpcBusy then
-				statusLabel.Text = "Status: Moving to Maze Merchant..."
-				statusLabel.TextColor3 = Color3.fromRGB(255, 210, 120)
-			elseif state.isClearing then
-				statusLabel.Text = "Status: " .. (state.clearStatusText ~= "" and state.clearStatusText or "Clearing...")
-				statusLabel.TextColor3 = Color3.fromRGB(255, 210, 120)
-			else
-				statusLabel.Text = "Status: Idle"
-				statusLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
-			end
+		applyToggle(bossBtn, state.autoBoss, "Auto Boss: " .. (state.autoBoss and "ON" or "OFF"), Color3.fromRGB(160, 67, 67))
+		applyToggle(tBtn, state.autoPressT, "Auto T: " .. (state.autoPressT and "ON" or "OFF"), Color3.fromRGB(66, 110, 176))
+		applyToggle(minerBtn, state.autoMiner, "Auto Miner: " .. minerText)
+		applyToggle(defendBtn, state.autoDefend, "Auto Defend: " .. defendText)
+		applyToggle(clearBtn, state.autoClearTrash, "Auto Clear Trash: " .. (state.autoClearTrash and "ON" or "OFF"), Color3.fromRGB(150, 117, 50))
+		applyToggle(monsterFarmBtn, state.autoMonsterFarm, "Auto Monster Farm: " .. monsterFarmText, Color3.fromRGB(92, 76, 173))
+		applyToggle(luckAutoBtn, state.autoUseLuckPotion, "Auto Luck Potion: " .. (state.autoUseLuckPotion and "ON" or "OFF"))
+		applyToggle(luckBuyBtn, state.autoBuyLuckPotion, "Auto Buy Luck: " .. (state.autoBuyLuckPotion and "ON" or "OFF"))
+		applyToggle(minerPotionBtn, state.autoUseMinerPotion, "Auto Miner Potion: " .. (state.autoUseMinerPotion and "ON" or "OFF"))
+		applyToggle(minerBuyBtn, state.autoBuyMinerPotion, "Auto Buy Miner: " .. (state.autoBuyMinerPotion and "ON" or "OFF"))
+
+		if state.autoNpcBusy then
+			mazeBtn.Text = "Go Maze Merchant: MOVING"
+			mazeBtn.BackgroundColor3 = Color3.fromRGB(220, 140, 40)
+		else
+			mazeBtn.Text = "Go Maze Merchant"
+			mazeBtn.BackgroundColor3 = Color3.fromRGB(52, 58, 72)
+		end
+
+		worldValue.Text = detectCurrentWorldName()
+
+		if state.autoBoss and state.bossInProgress then
+			statusValue.Text = "Boss in progress..."
+			statusValue.TextColor3 = Color3.fromRGB(255, 128, 128)
+		elseif state.autoBoss and state.bossPriorityActive then
+			statusValue.Text = "Waiting / switching to boss..."
+			statusValue.TextColor3 = Color3.fromRGB(255, 180, 105)
+		elseif state.autoNpcBusy then
+			statusValue.Text = "Moving to Maze Merchant..."
+			statusValue.TextColor3 = Color3.fromRGB(255, 214, 140)
+		elseif state.isClearing then
+			statusValue.Text = state.clearStatusText ~= "" and state.clearStatusText or "Clearing..."
+			statusValue.TextColor3 = Color3.fromRGB(255, 214, 140)
+		elseif state.autoMonsterFarm then
+			statusValue.Text = "Monster farming"
+			statusValue.TextColor3 = Color3.fromRGB(172, 204, 255)
+		elseif state.autoMiner then
+			statusValue.Text = "Mining"
+			statusValue.TextColor3 = Color3.fromRGB(172, 255, 194)
+		else
+			statusValue.Text = "Idle"
+			statusValue.TextColor3 = Color3.fromRGB(225, 230, 240)
 		end
 	end
 
+	-------------------------------------------------
+	-- Actions
+	-------------------------------------------------
 	bossBtn.MouseButton1Click:Connect(function()
 		state.autoBoss = not state.autoBoss
+		refreshButtons()
+	end)
+
+	tBtn.MouseButton1Click:Connect(function()
+		state.autoPressT = not state.autoPressT
 		refreshButtons()
 	end)
 
@@ -714,26 +917,6 @@ function UI.create(state)
 		if state.autoMiner then
 			state.autoMonsterFarm = false
 		end
-		refreshButtons()
-	end)
-
-	mazeBtn.MouseButton1Click:Connect(function()
-		if state.autoNpcBusy then
-			return
-		end
-
-		if state.goToMazeMerchant then
-			state.goToMazeMerchant()
-		else
-			warn("state.goToMazeMerchant not found")
-		end
-
-		refreshButtons()
-	end)
-
-	tBtn.MouseButton1Click:Connect(function()
-		state.autoPressT = not state.autoPressT
-		print("autoPressT =", state.autoPressT)
 		refreshButtons()
 	end)
 
@@ -775,22 +958,97 @@ function UI.create(state)
 		refreshButtons()
 	end)
 
-	local dragToggle = nil
+	mazeBtn.MouseButton1Click:Connect(function()
+		if state.autoNpcBusy then
+			return
+		end
+
+		if state.goToMazeMerchant then
+			state.goToMazeMerchant()
+		else
+			warn("state.goToMazeMerchant not found")
+		end
+
+		refreshButtons()
+	end)
+
+	closeBtn.MouseButton1Click:Connect(function()
+		getgenv().RobloxUIRunning = false
+
+		state.autoBoss = false
+		state.autoMiner = false
+		state.autoPressT = false
+		state.autoDefend = false
+		state.autoMonsterFarm = false
+		state.autoClearTrash = false
+		state.isClearing = false
+		state.clearStatusText = "Stopped"
+		state.autoUseLuckPotion = false
+		state.autoBuyLuckPotion = false
+		state.autoUseMinerPotion = false
+		state.autoBuyMinerPotion = false
+
+		refreshButtons()
+		screenGui:Destroy()
+	end)
+
+	-------------------------------------------------
+	-- Collapse / Maximize
+	-------------------------------------------------
+	local function closeAllDropdowns()
+		locationSelect.close()
+		mineralSelect.close()
+		oreSelect.close()
+		monsterSelect.close()
+	end
+
+	local function setCollapsed(collapsed)
+		isCollapsed = collapsed
+		closeAllDropdowns()
+
+		if collapsed then
+			contentHolder.Visible = false
+			frame:TweenSize(collapsedSize, Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.15, true)
+			collapseBtn.Text = "+"
+		else
+			contentHolder.Visible = true
+			frame:TweenSize(isMaximized and maximizedSize or expandedSize, Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.15, true)
+			collapseBtn.Text = "—"
+		end
+	end
+
+	local function setMaximized(maximized)
+		isMaximized = maximized
+		closeAllDropdowns()
+
+		if maximized then
+			storedPosition = frame.Position
+			storedSize = frame.Size
+			frame:TweenPosition(UDim2.new(0.5, 0, 0.5, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.15, true)
+			frame:TweenSize(maximizedSize, Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.15, true)
+			maxBtn.Text = "❐"
+		else
+			frame:TweenPosition(storedPosition, Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.15, true)
+			frame:TweenSize(isCollapsed and collapsedSize or expandedSize, Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.15, true)
+			maxBtn.Text = "▢"
+		end
+	end
+
+	collapseBtn.MouseButton1Click:Connect(function()
+		setCollapsed(not isCollapsed)
+	end)
+
+	maxBtn.MouseButton1Click:Connect(function()
+		setMaximized(not isMaximized)
+	end)
+
+	-------------------------------------------------
+	-- Dragging
+	-------------------------------------------------
+	local dragToggle = false
 	local dragInput = nil
 	local dragStart = nil
 	local startPos = nil
-
-	statusLabel = Instance.new("TextLabel")
-	statusLabel.Size = UDim2.new(1, -20, 0, 24)
-	statusLabel.Position = UDim2.new(0, 10, 0, 285)
-	statusLabel.BackgroundTransparency = 1
-	statusLabel.Font = Enum.Font.Gotham
-	statusLabel.TextSize = 13
-	statusLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
-	statusLabel.TextXAlignment = Enum.TextXAlignment.Left
-	statusLabel.Text = "Status: Idle"
-	statusLabel.Parent = content
-
 
 	local function updateDrag(input)
 		local delta = input.Position - dragStart
@@ -803,6 +1061,10 @@ function UI.create(state)
 	end
 
 	header.InputBegan:Connect(function(input)
+		if isMaximized then
+			return
+		end
+
 		if input.UserInputType == Enum.UserInputType.MouseButton1
 			or input.UserInputType == Enum.UserInputType.Touch then
 			dragToggle = true
@@ -830,47 +1092,16 @@ function UI.create(state)
 		end
 	end)
 
-	local function setCollapsed(collapsed)
-		isCollapsed = collapsed
-
-		if collapsed then
-			locationSelect.close()
-			mineralSelect.close()
-			oreSelect.close()
-			monsterSelect.close()
-			content.Visible = false
-			frame:TweenSize(
-				UDim2.new(0, 340, 0, collapsedHeight),
-				Enum.EasingDirection.Out,
-				Enum.EasingStyle.Quad,
-				0.15,
-				true
-			)
-			collapseBtn.Text = "+"
-		else
-			content.Visible = true
-			frame:TweenSize(
-				UDim2.new(0, 340, 0, expandedHeight),
-				Enum.EasingDirection.Out,
-				Enum.EasingStyle.Quad,
-				0.15,
-				true
-			)
-			collapseBtn.Text = "—"
-		end
-	end
-
-	collapseBtn.MouseButton1Click:Connect(function()
-		setCollapsed(not isCollapsed)
-	end)
-
+	-------------------------------------------------
+	-- Start
+	-------------------------------------------------
 	refreshButtons()
 	setCollapsed(false)
 
 	task.spawn(function()
 		while getgenv().RobloxUIRunning and screenGui.Parent do
 			refreshButtons()
-			task.wait(0.2)
+			task.wait(0.3)
 		end
 	end)
 
