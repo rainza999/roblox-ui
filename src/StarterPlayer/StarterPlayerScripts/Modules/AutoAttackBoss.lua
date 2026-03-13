@@ -129,13 +129,14 @@ function AutoAttackBoss.run(State)
 
 		return nil
 	end
-	
+		
 	local function ensureWeaponEquipped()
 		local already = hasEquippedWeapon()
 		if already then
 			return true
 		end
 
+		-- ลอง invoke server ก่อน
 		local ok, err = pcall(function()
 			ReplicatedStorage
 				:WaitForChild("Shared")
@@ -149,20 +150,32 @@ function AutoAttackBoss.run(State)
 		end)
 
 		if not ok then
-			warn("[AutoAttackBoss] Equip failed:", err)
-			return false
+			warn("[AutoAttackBoss] Equip via ToolActivated failed:", err)
 		end
 
 		local equipped = waitForEquippedObject(hasEquippedWeapon, 2)
 		if equipped then
-			print("[AutoAttackBoss] Weapon equipped:", equipped.Name)
+			print("[AutoAttackBoss] Weapon equipped via ToolActivated:", equipped.Name)
 			return true
 		end
 
-		warn("[AutoAttackBoss] Weapon not found after ToolActivated")
+		-- ถ้ายังไม่ขึ้น ค่อย fallback ไปกดปุ่ม 2
+		local pressed = pressKey(Enum.KeyCode.Two)
+		if not pressed then
+			warn("[AutoAttackBoss] Failed to press key 2")
+			return false
+		end
+
+		equipped = waitForEquippedObject(hasEquippedWeapon, 2)
+		if equipped then
+			print("[AutoAttackBoss] Weapon equipped via key 2:", equipped.Name)
+			return true
+		end
+
+		warn("[AutoAttackBoss] Weapon not found after ToolActivated and key 2")
 		return false
 	end
-
+	
 	local function attack()
 		local ok, err = pcall(function()
 			ReplicatedStorage
@@ -189,7 +202,7 @@ function AutoAttackBoss.run(State)
 		noclip(true)
 
 		ensureWeaponEquipped()
-		
+
 		while getgenv().RobloxUIRunning and bossModel and bossModel.Parent do
 			if State and not State.autoBoss then
 				noclip(false)

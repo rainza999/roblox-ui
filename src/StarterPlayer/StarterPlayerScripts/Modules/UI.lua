@@ -8,7 +8,7 @@ function UI.create(state)
 	local player = Players.LocalPlayer
 	local playerGui = player:WaitForChild("PlayerGui")
 
-	local oldGui = playerGui:FindFirstChild("ControlPanel V.7.1")
+	local oldGui = playerGui:FindFirstChild("ControlPanel V.7.2")
 	if oldGui then
 		oldGui:Destroy()
 	end
@@ -107,7 +107,7 @@ function UI.create(state)
 	-- GUI Root
 	-------------------------------------------------
 	local screenGui = Instance.new("ScreenGui")
-	screenGui.Name = "ControlPanel V.7.1"
+	screenGui.Name = "ControlPanel V.7.2"
 	screenGui.ResetOnSpawn = false
 	screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	screenGui.Parent = playerGui
@@ -272,7 +272,7 @@ function UI.create(state)
 	title.Size = UDim2.new(1, -140, 1, 0)
 	title.Position = UDim2.new(0, 14, 0, 0)
 	title.BackgroundTransparency = 1
-	title.Text = "Control Panel V.7.1"
+	title.Text = "Control Panel V.7.2"
 	title.Font = Enum.Font.GothamBold
 	title.TextSize = 20
 	title.TextColor3 = Color3.fromRGB(245, 247, 255)

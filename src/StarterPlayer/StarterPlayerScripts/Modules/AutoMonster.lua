@@ -117,6 +117,7 @@ function AutoMonster.run(State)
 			return true
 		end
 
+		-- ลอง invoke server ก่อน
 		local ok, err = pcall(function()
 			ReplicatedStorage
 				:WaitForChild("Shared")
@@ -130,17 +131,29 @@ function AutoMonster.run(State)
 		end)
 
 		if not ok then
-			warn("[AutoMonster] Equip failed:", err)
-			return false
+			warn("[AutoAttackBoss] Equip via ToolActivated failed:", err)
 		end
 
 		local equipped = waitForEquippedObject(hasEquippedWeapon, 2)
 		if equipped then
-			print("[AutoMonster] Weapon equipped:", equipped.Name)
+			print("[AutoAttackBoss] Weapon equipped via ToolActivated:", equipped.Name)
 			return true
 		end
 
-		warn("[AutoMonster] Weapon not found after ToolActivated")
+		-- ถ้ายังไม่ขึ้น ค่อย fallback ไปกดปุ่ม 2
+		local pressed = pressKey(Enum.KeyCode.Two)
+		if not pressed then
+			warn("[AutoAttackBoss] Failed to press key 2")
+			return false
+		end
+
+		equipped = waitForEquippedObject(hasEquippedWeapon, 2)
+		if equipped then
+			print("[AutoAttackBoss] Weapon equipped via key 2:", equipped.Name)
+			return true
+		end
+
+		warn("[AutoAttackBoss] Weapon not found after ToolActivated and key 2")
 		return false
 	end
 
@@ -851,7 +864,7 @@ function AutoMonster.run(State)
 		local maxRepathFailures = 3
 
 		ensureWeaponEquipped()
-		
+
 		local REPOSITION_TRIGGER = ATTACK_RANGE + 2     -- เกินนี้ค่อยขยับใหม่
 		local HARD_REPATH_TRIGGER = 16                  -- ไกลมาก = วิ่งเข้าใหม่ชัดเจน
 
