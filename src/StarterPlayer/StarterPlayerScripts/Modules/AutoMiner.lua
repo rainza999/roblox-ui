@@ -1174,7 +1174,7 @@ function AutoMiner.run(State)
 			end
 
 			-- ระหว่างทุบให้เกาะแร่ตลอด
-			stickToTargetPart(targetPart, 2.2)
+			-- stickToTargetPart(targetPart, 2.2)
 
             if oreMode then
 				local oreSpawned = hasAnyOreSpawned(mineral)
@@ -1195,7 +1195,7 @@ function AutoMiner.run(State)
 				return false
 			end
 
-            stickToTargetPart(targetPart, 2.2)
+            -- stickToTargetPart(targetPart, 2.2)
 			faceTargetPart(targetPart)
 			mining()
 			task.wait(0.12)
