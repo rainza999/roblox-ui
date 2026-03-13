@@ -699,6 +699,8 @@ function AutoMiner.run(State)
         local targetPos = targetPart.Position
         local dist = (targetPos - hrp.Position).Magnitude
 
+        print("[AutoMiner] tween dist =", dist, " time =", tweenTime, " target =", targetPart.Name)
+        
         local tween = TweenService:Create(
             hrp,
             TweenInfo.new(math.max(dist / 85, 0.05), Enum.EasingStyle.Linear),
