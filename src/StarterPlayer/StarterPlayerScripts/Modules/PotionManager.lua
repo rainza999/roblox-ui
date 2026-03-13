@@ -38,7 +38,7 @@ function PotionManager.run(State)
 			buyCooldown = 2,
 			useCooldown = 0.8,
 			rebuffWhenRemainAtOrBelow = 240,
-			buyPolicy = "maintain", -- ใช้แล้วซื้อคืนให้ stock = 10
+			buyPolicy = "maintain",
 		},
 		MinerPotion1 = {
 			name = "MinerPotion1",
@@ -48,7 +48,7 @@ function PotionManager.run(State)
 			buyCooldown = 2,
 			useCooldown = 0.8,
 			rebuffWhenRemainAtOrBelow = 240,
-			buyPolicy = "empty", -- ซื้อใหม่เมื่อของในกระเป๋าหมดเท่านั้น
+			buyPolicy = "empty",
 		},
 	}
 
@@ -107,36 +107,16 @@ function PotionManager.run(State)
 		return State.pauseOwner ~= nil and State.pauseOwner ~= owner
 	end
 
-	local function getPotionShopPosition()
-		local shops = workspace:FindFirstChild("Shops")
-		if not shops then
-			return nil
-		end
-
-		local shop = shops:FindFirstChild("Potion Shop")
-		if not shop then
-			return nil
-		end
-
-		return shop:GetPivot().Position
-	end
-
-	local function debugPotionShopBooks()
-		local shops = workspace:FindFirstChild("Shops")
-		if not shops then
-			warn("[PotionShop] Shops not found")
+	local function debugPotionTargets()
+		local proximity = workspace:FindFirstChild("Proximity")
+		if not proximity then
+			warn("[PotionShop] Proximity not found")
 			return
 		end
 
-		local shop = shops:FindFirstChild("Potion Shop")
-		if not shop then
-			warn("[PotionShop] Potion Shop not found")
-			return
-		end
-
-		print("=== Potion Shop Descendants ===")
-		for _, obj in ipairs(shop:GetDescendants()) do
-			if string.find(obj.Name:lower(), "book") then
+		print("=== Proximity Descendants ===")
+		for _, obj in ipairs(proximity:GetDescendants()) do
+			if obj.Name == "LuckPotion1" or obj.Name == "MinerPotion1" then
 				print(obj:GetFullName(), "| class =", obj.ClassName)
 			end
 		end
@@ -183,7 +163,7 @@ function PotionManager.run(State)
 			end
 
 			local dist = (hrp.Position - targetPos).Magnitude
-			if dist <= 4 then
+			if dist <= 2 then
 				if conn then
 					conn:Disconnect()
 				end
@@ -210,120 +190,79 @@ function PotionManager.run(State)
 		return (hrp.Position - targetPos).Magnitude <= 6
 	end
 
-	local function getPotionShopBookPosition()
-		local shops = workspace:FindFirstChild("Shops")
-		if not shops then
+	local function getPotionBuyPosition(toolName)
+		local proximity = workspace:FindFirstChild("Proximity")
+		if not proximity then
+			warn("[PotionShop] workspace.Proximity not found")
 			return nil
 		end
 
-		local shop = shops:FindFirstChild("Potion Shop")
-		if not shop then
+		local target = proximity:FindFirstChild(toolName)
+		if not target then
+			warn("[PotionShop] Proximity target not found:", toolName)
 			return nil
 		end
 
-		local hrp = getHRP()
-		if not hrp then
-			return nil
+		local ok, pivot = pcall(function()
+			return target.WorldPivot
+		end)
+
+		if ok and pivot then
+			return pivot.Position
 		end
 
-		local nearestPos = nil
-		local nearestDist = math.huge
+		local ok2, cf = pcall(function()
+			return target:GetPivot()
+		end)
 
-		for _, obj in ipairs(shop:GetDescendants()) do
-			if obj.Name == "Book" then
-				local pos = nil
-
-				if obj:IsA("BasePart") then
-					pos = obj.Position
-				elseif obj:IsA("Model") then
-					pos = obj:GetPivot().Position
-				end
-
-				if pos then
-					local dist = (pos - hrp.Position).Magnitude
-					if dist < nearestDist then
-						nearestDist = dist
-						nearestPos = pos
-					end
-				end
-			end
+		if ok2 and cf then
+			return cf.Position
 		end
 
-		return nearestPos
-	end
-
-	local function moveNearBookForMinerPotion()
-		local hrp = getHRP()
-		local bookPos = getPotionShopBookPosition()
-
-		if not hrp or not bookPos then
-			debugPotionShopBooks()
-			warn("[PotionShop] Book position not found")
-			return false
+		local part = target:IsA("BasePart") and target or target:FindFirstChildWhichIsA("BasePart", true)
+		if part then
+			return part.Position
 		end
 
-		local dist = (hrp.Position - bookPos).Magnitude
-		print("[PotionShop] nearest Book dist =", math.floor(dist))
-
-		if dist <= 3.5 then
-			return true
-		end
-
-		local dir = (bookPos - hrp.Position)
-		if dir.Magnitude > 0.001 then
-			dir = dir.Unit
-		else
-			dir = Vector3.new(0, 0, -1)
-		end
-
-		local targetPos = bookPos - (dir * 0.8) + Vector3.new(0, 2.0, 0)
-
-		print("[PotionShop] tweening close to Book for MinerPotion...")
-		local ok = tweenToPosition(targetPos, 80)
-		if not ok then
-			warn("[PotionShop] tween to Book failed")
-			return false
-		end
-
-		task.wait(0.15)
-		return true
+		warn("[PotionShop] Could not resolve buy position for:", toolName)
+		return nil
 	end
 
 	local function ensureNearPotionShop(toolName)
-		toolName = toolName or ""
+        local hrp = getHRP()
+        local targetPos = getPotionBuyPosition(toolName)
 
-		local hrp = getHRP()
-		local shopPos = getPotionShopPosition()
+        if not hrp or not targetPos then
+            debugPotionTargets()
+            warn("[PotionShop] missing targetPos or hrp for", toolName)
+            return false
+        end
 
-		if not hrp or not shopPos then
-			warn("[PotionShop] missing shopPos or hrp")
-			return false
-		end
+        local movePos = targetPos
 
-		local dist = (hrp.Position - shopPos).Magnitude
-		if dist > 15 then
-			local targetPos = shopPos + Vector3.new(0, 3, 6)
-			print("[PotionShop] tweening to shop, dist =", math.floor(dist))
+        print(
+            "[PotionShop] exact target for",
+            toolName,
+            "=>",
+            math.floor(movePos.X),
+            math.floor(movePos.Y),
+            math.floor(movePos.Z)
+        )
 
-			local ok = tweenToPosition(targetPos, 100)
-			if not ok then
-				warn("[PotionShop] tween failed")
-				return false
-			end
+        local dist = (hrp.Position - movePos).Magnitude
+        if dist <= 2 then
+            return true
+        end
 
-			task.wait(0.15)
-		end
+        local ok = tweenToPosition(movePos, 100)
+        if not ok then
+            warn("[PotionShop] tween failed for", toolName)
+            return false
+        end
 
-		if toolName == "MinerPotion1" then
-			local ok = moveNearBookForMinerPotion()
-			if not ok then
-				warn("[PotionShop] failed to move close enough to Book for MinerPotion")
-				return false
-			end
-		end
-
-		return true
-	end
+        task.wait(0.15)
+        return true
+    end
 
 	local function findToolInstance(toolName)
 		local backpack = getBackpack()
