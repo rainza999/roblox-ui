@@ -702,7 +702,7 @@ function AutoMiner.run(State)
         noclip(true)
 
         local dist = (standPos - hrp.Position).Magnitude
-        local tweenTime = math.max(dist / 20, 0.15)
+        local tweenTime = math.max(dist / 85, 0.15)
 
         print("[AutoMiner] tween dist =", dist, " time =", tweenTime, " target =", targetPart.Name)
 
