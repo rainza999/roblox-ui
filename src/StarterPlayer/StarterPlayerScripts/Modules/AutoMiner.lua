@@ -128,6 +128,7 @@ function AutoMiner.run(State)
     end
 
 	local skippedMinerals = {}
+    local printedOreMinerals = {}
 
 	local function getCharacterParts()
 		local character = player.Character or player.CharacterAdded:Wait()
@@ -529,23 +530,29 @@ function AutoMiner.run(State)
 	end
 
 	local function printOreSummary(mineral)
-		local total, oreNames, hasMatch, matchedNames = getOreSummary(mineral)
+        if printedOreMinerals[mineral] then
+            return
+        end
 
-		if total <= 0 then
-			print("[AutoMiner] 0 Ore")
-			return
-		end
+        printedOreMinerals[mineral] = true
 
-		local oreText = table.concat(oreNames, ", ")
-		local matchText = hasMatch and "YES" or "NO"
+        local total, oreNames, hasMatch, matchedNames = getOreSummary(mineral)
 
-		print(string.format(
-			"[AutoMiner] %d Ore (%s) | Match: %s",
-			total,
-			oreText,
-			matchText
-		))
-	end
+        if total <= 0 then
+            print("[AutoMiner] 0 Ore")
+            return
+        end
+
+        local oreText = table.concat(oreNames, ", ")
+        local matchText = hasMatch and "YES" or "NO"
+
+        print(string.format(
+            "[AutoMiner] %d Ore (%s) | Match: %s",
+            total,
+            oreText,
+            matchText
+        ))
+    end
 
     local lastOreSummaryText = ""
 
@@ -1320,11 +1327,7 @@ function AutoMiner.run(State)
 				return false
 			end
 
-            local realDist = (targetPart.Position - hrp.Position).Magnitude
-            if realDist > 8 then
-                task.wait(0.1)
-                continue
-            end
+            stickToTargetPart(targetPart, 2.2)
 			faceTargetPart(targetPart)
 			mining()
 			task.wait(0.15)
@@ -1375,6 +1378,7 @@ function AutoMiner.run(State)
 			setPreviewMineral(mineral)
 
 			print("[AutoMiner] Start mining:", mineral.Name)
+            printedOreMinerals[mineral] = nil
 
             local moved = moveToMiner(mineral)
             if not moved then
