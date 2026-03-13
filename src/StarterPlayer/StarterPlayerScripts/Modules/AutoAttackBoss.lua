@@ -1,5 +1,7 @@
 local AutoAttackBoss = {}
-
+State.bossInProgress = State.bossInProgress or false
+State.bossPriorityActive = State.bossPriorityActive or false
+State.bossNextRunAt = State.bossNextRunAt or 0
 function AutoAttackBoss.run(State)
 	print("AutoAttackBoss started")
 
@@ -14,6 +16,11 @@ function AutoAttackBoss.run(State)
 		local humanoid = character:WaitForChild("Humanoid")
 		local hrp = character:WaitForChild("HumanoidRootPart")
 		return character, humanoid, hrp
+	end
+
+	local function getNext5MinuteTimestamp()
+		local now = os.time()
+		return now - (now % 300) + 300
 	end
 
 	-------------------------------------------------
@@ -153,11 +160,42 @@ function AutoAttackBoss.run(State)
 		end
 	end
 
+	local PREPARE_BEFORE_BOSS = 8
+
 	while getgenv().RobloxUIRunning do
 		if not State.autoBoss then
+			State.bossInProgress = false
+			State.bossPriorityActive = false
+			State.bossNextRunAt = getNext5MinuteTimestamp()
 			task.wait(0.2)
 			continue
 		end
+
+		local now = os.time()
+
+		if State.bossNextRunAt == 0 or State.bossNextRunAt <= now then
+			State.bossNextRunAt = getNext5MinuteTimestamp()
+		end
+
+		if now >= (State.bossNextRunAt - PREPARE_BEFORE_BOSS) then
+			State.bossPriorityActive = true
+		else
+			State.bossPriorityActive = false
+			task.wait(0.2)
+			continue
+		end
+
+		while getgenv().RobloxUIRunning and State.autoBoss and os.time() < State.bossNextRunAt do
+			task.wait(0.2)
+		end
+
+		if not getgenv().RobloxUIRunning or not State.autoBoss then
+			continue
+		end
+
+		State.bossInProgress = true
+		State.bossPriorityActive = true
+		State.autoNpcBusy = true
 
 		local startTime = os.time()
 		local nextRunTime = getNext5MinuteTimestamp()
@@ -235,16 +273,18 @@ function AutoAttackBoss.run(State)
 
 		task.wait(5)
 
-		if State.autoPressT then
-			pressT()
-		end
-
 		if finishTime < nextRunTime then
 			print("ยังไม่ถึงเวลา รอถึง:", os.date("%H:%M:%S", nextRunTime))
 			waitUntil(nextRunTime)
 		else
 			print("ครบเวลาแล้ว ลงต่อได้ทันที")
 		end
+
+		-- พอตีเสร็จ
+		State.autoNpcBusy = false
+		State.bossInProgress = false
+		State.bossPriorityActive = false
+		State.bossNextRunAt = getNext5MinuteTimestamp()
 
 		task.wait(0.2)
 	end

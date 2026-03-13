@@ -7,13 +7,13 @@ function UI.create(state)
 	local player = Players.LocalPlayer
 	local playerGui = player:WaitForChild("PlayerGui")
 
-	local oldGui = playerGui:FindFirstChild("ControlPanel V.3")
+	local oldGui = playerGui:FindFirstChild("ControlPanel V.4")
 	if oldGui then
 		oldGui:Destroy()
 	end
 
 	local screenGui = Instance.new("ScreenGui")
-	screenGui.Name = "ControlPanel V.3"
+	screenGui.Name = "ControlPanel V.4"
 	screenGui.ResetOnSpawn = false
 	screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	screenGui.Parent = playerGui
@@ -150,7 +150,7 @@ function UI.create(state)
 	title.Size = UDim2.new(1, -90, 1, 0)
 	title.Position = UDim2.new(0, 12, 0, 0)
 	title.BackgroundTransparency = 1
-	title.Text = "Control Panel V.3"
+	title.Text = "Control Panel V.4"
 	title.Font = Enum.Font.GothamBold
 	title.TextColor3 = Color3.new(1, 1, 1)
 	title.TextSize = 18
@@ -685,7 +685,13 @@ function UI.create(state)
 		end
 
 		if statusLabel then
-			if state.autoNpcBusy then
+			if state.autoBoss and state.bossInProgress then
+				statusLabel.Text = "Status: Boss in progress..."
+				statusLabel.TextColor3 = Color3.fromRGB(255, 120, 120)
+			elseif state.autoBoss and state.bossPriorityActive then
+				statusLabel.Text = "Status: Waiting / switching to boss..."
+				statusLabel.TextColor3 = Color3.fromRGB(255, 170, 90)
+			elseif state.autoNpcBusy then
 				statusLabel.Text = "Status: Moving to Maze Merchant..."
 				statusLabel.TextColor3 = Color3.fromRGB(255, 210, 120)
 			elseif state.isClearing then

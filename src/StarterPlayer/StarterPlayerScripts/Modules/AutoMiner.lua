@@ -201,6 +201,22 @@ function AutoMiner.run(State)
         return ControllerLock.isOwnedByOther(State, "AutoMiner")
     end
 
+    local function isBossPriorityActive()
+		if not State.autoBoss then
+			return false
+		end
+
+		if State.bossInProgress then
+			return true
+		end
+
+		if State.bossPriorityActive then
+			return true
+		end
+
+		return false
+	end
+
 	local function mining()
 		local ok = setMode("mining")
 		if not ok then
@@ -691,7 +707,7 @@ function AutoMiner.run(State)
 	end
 
     local function moveToTargetPart(targetPart, stopDistance)
-        if isPausedForAutoMiner() then
+        if isPausedForAutoMiner() or isBossPriorityActive() then
             return false
         end
 
@@ -722,7 +738,7 @@ function AutoMiner.run(State)
         tween:Play()
 
         while tween.PlaybackState == Enum.PlaybackState.Playing do
-            if isPausedForAutoMiner() then
+            if isPausedForAutoMiner() or isBossPriorityActive() then
                 tween:Cancel()
                 noclip(false)
                 return false
@@ -1156,7 +1172,7 @@ function AutoMiner.run(State)
 		local lastHp = getMinerHealth(mineral)
 
 		while getgenv().RobloxUIRunning and State.autoMiner and mineral and mineral.Parent and tick() < timeout do
-            if isPausedForAutoMiner() then
+            if isPausedForAutoMiner() or isBossPriorityActive() then
                 return false
             end
             -- ถ้ามีมอนเข้ามาใกล้ ให้ไปจัดมอนก่อน แล้วค่อยกลับมา
@@ -1284,7 +1300,7 @@ function AutoMiner.run(State)
 		local timeout = tick() + 20
 		while getgenv().RobloxUIRunning and State.autoClearTrash and mineral and mineral.Parent and tick() < timeout do
 			
-            if isPausedForAutoMiner() then
+            if isPausedForAutoMiner() or isBossPriorityActive() then
                 State.isClearing = false
                 State.clearStatusText = ""
                 return false
@@ -1341,6 +1357,15 @@ function AutoMiner.run(State)
 	while getgenv().RobloxUIRunning do
 
         if isPausedForAutoMiner() then
+            task.wait(0.1)
+            continue
+        end
+
+        if isBossPriorityActive() then
+            ControllerLock.release(State, "AutoMiner")
+            clearPreviewMineral()
+            clearActiveMineral()
+            noclip(false)
             task.wait(0.1)
             continue
         end
