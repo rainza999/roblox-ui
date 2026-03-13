@@ -490,8 +490,10 @@ function AutoMonster.run(State)
 			targetPos.Z - flatDir.Z * desiredDistance
 		)
 
-		-- ใช้ Y ปัจจุบันของเราไปเลย ไม่ต้อง raycast หาพื้น
-		return Vector3.new(desiredXZ.X, myPos.Y, desiredXZ.Z)
+		-- ใช้ระดับกลาง ๆ ไม่สูงหรือต่ำเกิน
+		local desiredY = myPos.Y + ((targetPos.Y - myPos.Y) * 0.7)
+
+		return Vector3.new(desiredXZ.X, desiredY, desiredXZ.Z)
 	end
 	-- local function getSafeStandPositionNearTarget(targetPart, stopDistance)
 	-- 	local character, _, hrp = getCharacterParts()
@@ -554,12 +556,20 @@ function AutoMonster.run(State)
 		local _, _, hrp = getCharacterParts()
 		local originalTargetPos = targetPart.Position
 
-		local standPos = getApproachPosition(targetPart, stopDistance or STOP_DISTANCE)
-		if not standPos then
-			return false
+		local yDiff = math.abs(targetPart.Position.Y - hrp.Position.Y)
+		local moved
+
+		-- ถ้าระดับสูงต่างกันมาก หรืออยู่คนละชั้น ไปหามอนตรง ๆ ก่อน
+		if yDiff > 6 then
+			moved = tweenTo(targetPart.Position, 85)
+		else
+			local standPos = getApproachPosition(targetPart, stopDistance or STOP_DISTANCE)
+			if not standPos then
+				return false
+			end
+			moved = tweenTo(standPos, 85)
 		end
 
-		local moved = tweenTo(standPos, 85)
 		if not moved then
 			return false
 		end
@@ -795,7 +805,7 @@ function AutoMonster.run(State)
 
 			-- ยังไกลอยู่ ค่อยเข้าหา
 			if dist > REPOSITION_TRIGGER then
-				local moved = moveToTargetPart(part, STOP_DISTANCE)
+				local moved = tweenTo(part.Position, 60)
 				if not moved then
 					repathFailures += 1
 					if repathFailures >= maxRepathFailures then
