@@ -11,7 +11,7 @@ function PressT.tap()
 	VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.T, false, game)
 end
 
-function PressT.start(State)
+function PressT.run(State)
 	if started then
 		return
 	end
