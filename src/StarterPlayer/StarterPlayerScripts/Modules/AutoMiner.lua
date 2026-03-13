@@ -788,7 +788,7 @@ function AutoMiner.run(State)
 
         local finalY
         if groundY then
-            finalY = groundY + 3
+            finalY = groundY + 1.25
         else
             finalY = math.max(myPos.Y, targetPos.Y)
         end
@@ -1185,16 +1185,7 @@ function AutoMiner.run(State)
             end
 
 			-- ระหว่างทุบให้เกาะแร่ตลอด
-            stickToTargetPart(targetPart, 2.2)
-
-            local realDist = (targetPart.Position - hrp.Position).Magnitude
-            if realDist > 8 then
-                stickToTargetPart(targetPart, 2.2)
-                task.wait(0.05)
-                continue
-            end
-
-            stickToTargetPart(targetPart, 2.2)
+            -- stickToTargetPart(targetPart, 2.2)
             faceTargetPart(targetPart)
             mining()
             task.wait(0.12)
