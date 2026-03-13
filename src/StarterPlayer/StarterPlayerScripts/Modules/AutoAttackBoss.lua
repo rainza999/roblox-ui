@@ -11,8 +11,6 @@ function AutoAttackBoss.run(State)
 	State.autoNpcBusy = State.autoNpcBusy or false
 	State.bossImmediateRun = State.bossImmediateRun == nil and true or State.bossImmediateRun
 
-	print("State : ",State)
-
 	local TweenService = game:GetService("TweenService")
 	local Players = game:GetService("Players")
 	local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -31,10 +29,15 @@ function AutoAttackBoss.run(State)
 		return now - (now % 300) + 300
 	end
 
+	local function clearBossFlags()
+		State.autoNpcBusy = false
+		State.bossInProgress = false
+		State.bossPriorityActive = false
+	end
+
 	-------------------------------------------------
 	-- Noclip
 	-------------------------------------------------
-
 	local function noclip(state)
 		local char = player.Character
 		if not char then return end
@@ -77,6 +80,7 @@ function AutoAttackBoss.run(State)
 					end
 				end
 			end
+
 			task.wait(0.2)
 		end
 
@@ -99,11 +103,11 @@ function AutoAttackBoss.run(State)
 
 	local function followBoss(bossModel)
 		local _, humanoid, hrp = getCharacterParts()
-
 		noclip(true)
 
 		while getgenv().RobloxUIRunning and bossModel and bossModel.Parent do
 			if State and not State.autoBoss then
+				noclip(false)
 				return false
 			end
 
@@ -112,11 +116,13 @@ function AutoAttackBoss.run(State)
 
 			if not bossHumanoid or not bossHrp then
 				warn("Boss missing parts")
+				noclip(false)
 				return false
 			end
 
 			if bossHumanoid.Health <= 0 then
 				print("Boss defeated!")
+				noclip(false)
 				return true
 			end
 
@@ -136,168 +142,151 @@ function AutoAttackBoss.run(State)
 				_, humanoid, hrp = getCharacterParts()
 			end
 		end
+
 		noclip(false)
 		return false
 	end
 
-	local function waitUntil(ts)
-		while getgenv().RobloxUIRunning and os.time() < ts do
-			if State and not State.autoBoss then
-				return
-			end
-			task.wait(0.5)
-		end
-	end
+	local function runBossRound()
+		State.bossInProgress = true
+		State.bossPriorityActive = true
+		State.autoNpcBusy = true
 
-	local function pressT()
-		local ok, vim = pcall(function()
-			return game:GetService("VirtualInputManager")
+		local startTime = os.time()
+		print("เริ่มรอบบอส:", os.date("%H:%M:%S", startTime))
+
+		local _, _, hrp = getCharacterParts()
+		local createParty, _, _, doorPart = findCreatePartyStuff()
+
+		if not createParty or not doorPart then
+			warn("createParty or doorPart not found")
+			clearBossFlags()
+			State.bossNextRunAt = getNext5MinuteTimestamp()
+			return false
+		end
+
+		local cf = doorPart.CFrame
+		local dist = (cf.Position - hrp.Position).Magnitude
+		noclip(true)
+
+		local tween = TweenService:Create(hrp, TweenInfo.new(math.max(dist / 60, 0.1)), {CFrame = cf})
+		tween:Play()
+
+		while tween.PlaybackState == Enum.PlaybackState.Playing do
+			if not getgenv().RobloxUIRunning or not State.autoBoss then
+				tween:Cancel()
+				noclip(false)
+				clearBossFlags()
+				return false
+			end
+			task.wait()
+		end
+
+		noclip(false)
+		task.wait(0.5)
+
+		local prompt = createParty:FindFirstChildWhichIsA("ProximityPrompt", true)
+		if prompt then
+			pcall(function()
+				fireproximityprompt(prompt)
+			end)
+		else
+			warn("ProximityPrompt not found")
+		end
+
+		task.wait(1)
+
+		pcall(function()
+			ReplicatedStorage
+				:WaitForChild("Shared")
+				:WaitForChild("Packages")
+				:WaitForChild("Knit")
+				:WaitForChild("Services")
+				:WaitForChild("PartyService")
+				:WaitForChild("RF")
+				:WaitForChild("Activate")
+				:InvokeServer()
 		end)
 
-		if ok and vim then
-			vim:SendKeyEvent(true, Enum.KeyCode.T, false, game)
-			task.wait(0.05)
-			vim:SendKeyEvent(false, Enum.KeyCode.T, false, game)
+		local success = false
+		local living = workspace:FindFirstChild("Living")
+
+		if living then
+			local bossModel = waitForBoss(living, "^Asura's Incarnate%d+$", 30)
+
+			if bossModel then
+				print("Found boss:", bossModel.Name)
+				success = followBoss(bossModel)
+			else
+				warn("Boss not found within timeout")
+			end
 		else
-			warn("VirtualInputManager unavailable")
+			warn("Living folder not found")
 		end
+
+		local finishTime = os.time()
+		print("จบรอบบอส:", os.date("%H:%M:%S", finishTime))
+
+		-- สำคัญ: ปล่อย flag ทันทีหลังจบรอบ เพื่อให้ AutoMiner กลับไปทำงาน
+		clearBossFlags()
+
+		-- รอบถัดไป = นาที %5 ถัดไป
+		State.bossNextRunAt = getNext5MinuteTimestamp()
+		print("รอบบอสถัดไป:", os.date("%H:%M:%S", State.bossNextRunAt))
+
+		return success
 	end
 
 	local PREPARE_BEFORE_BOSS = 8
 
 	while getgenv().RobloxUIRunning do
 		if not State.autoBoss then
-			State.bossInProgress = false
-			State.bossPriorityActive = false
-			State.bossNextRunAt = getNext5MinuteTimestamp()
+			clearBossFlags()
+			State.bossNextRunAt = 0
+			State.bossImmediateRun = true
 			task.wait(0.2)
 			continue
 		end
 
 		local now = os.time()
 
+		-- รอบแรก เปิดแล้วไปเลย
 		if State.bossImmediateRun then
 			print("Immediate first boss run")
 			State.bossImmediateRun = false
-			State.bossPriorityActive = true
-		else
-			if State.bossNextRunAt == 0 or State.bossNextRunAt <= now then
-				State.bossNextRunAt = getNext5MinuteTimestamp()
-			end
-
-			if now >= (State.bossNextRunAt - PREPARE_BEFORE_BOSS) then
-				State.bossPriorityActive = true
-			else
-				State.bossPriorityActive = false
-				task.wait(0.2)
-				continue
-			end
-
-			while getgenv().RobloxUIRunning and State.autoBoss and os.time() < State.bossNextRunAt do
-				task.wait(0.2)
-			end
-		end
-
-		if not getgenv().RobloxUIRunning or not State.autoBoss then
+			runBossRound()
+			task.wait(0.2)
 			continue
 		end
 
-		State.bossInProgress = true
-		State.bossPriorityActive = true
-		State.autoNpcBusy = true
-
-		local startTime = os.time()
-		local nextRunTime = getNext5MinuteTimestamp()
-
-		print("เริ่มรอบ:", os.date("%H:%M:%S", startTime))
-		print("รอบถัดไปเริ่มได้ตอน:", os.date("%H:%M:%S", nextRunTime))
-
-		local _, _, hrp = getCharacterParts()
-		local createParty, _, _, doorPart = findCreatePartyStuff()
-
-		if createParty and doorPart then
-			local cf = doorPart.CFrame
-			local dist = (cf.Position - hrp.Position).Magnitude
-			noclip(true)
-
-			local tween = TweenService:Create(hrp, TweenInfo.new(dist / 60), {CFrame = cf})
-			tween:Play()
-
-			while tween.PlaybackState == Enum.PlaybackState.Playing do
-				if not getgenv().RobloxUIRunning then
-					tween:Cancel()
-					break
-				end
-				task.wait()
-			end
-
-			noclip(false)
-
-			task.wait(0.5)
-
-			local prompt = createParty:FindFirstChildWhichIsA("ProximityPrompt", true)
-			if prompt then
-				pcall(function()
-					fireproximityprompt(prompt)
-				end)
-			else
-				warn("ProximityPrompt not found")
-			end
-
-			task.wait(1)
-
-			pcall(function()
-				ReplicatedStorage
-					:WaitForChild("Shared")
-					:WaitForChild("Packages")
-					:WaitForChild("Knit")
-					:WaitForChild("Services")
-					:WaitForChild("PartyService")
-					:WaitForChild("RF")
-					:WaitForChild("Activate")
-					:InvokeServer()
-			end)
-
-			local living = workspace:FindFirstChild("Living")
-			if living then
-				local bossModel = waitForBoss(living, "^Asura's Incarnate%d+$", 30)
-
-				if bossModel then
-					print("Found boss:", bossModel.Name)
-					followBoss(bossModel)
-				else
-					warn("Boss not found within timeout")
-				end
-			else
-				warn("Living folder not found")
-			end
-		else
-			warn("createParty or doorPart not found")
+		-- ถ้ายังไม่มีรอบ ให้ set รอบ %5 ถัดไป
+		if State.bossNextRunAt == 0 then
+			State.bossNextRunAt = getNext5MinuteTimestamp()
 		end
 
-		task.wait(3)
+		now = os.time()
 
-		local finishTime = os.time()
-		print("จบรอบ:", os.date("%H:%M:%S", finishTime))
-
-		task.wait(5)
-
-		if finishTime < nextRunTime then
-			print("ยังไม่ถึงเวลา รอถึง:", os.date("%H:%M:%S", nextRunTime))
-			waitUntil(nextRunTime)
-		else
-			print("ครบเวลาแล้ว ลงต่อได้ทันที")
+		-- ถ้าเลยรอบไปแล้ว ให้เริ่มบอสเลย
+		if now >= State.bossNextRunAt then
+			runBossRound()
+			task.wait(0.2)
+			continue
 		end
 
-		-- พอตีเสร็จ
-		State.autoNpcBusy = false
-		State.bossInProgress = false
-		State.bossPriorityActive = false
-		State.bossNextRunAt = getNext5MinuteTimestamp()
+		-- ใกล้ถึงรอบ ค่อยบล็อก miner
+		if now >= (State.bossNextRunAt - PREPARE_BEFORE_BOSS) then
+			if not State.bossPriorityActive then
+				print("Boss priority active:", os.date("%H:%M:%S", now), "next =", os.date("%H:%M:%S", State.bossNextRunAt))
+			end
+			State.bossPriorityActive = true
+		else
+			State.bossPriorityActive = false
+		end
 
 		task.wait(0.2)
 	end
 
+	clearBossFlags()
 	print("AutoAttackBoss stopped")
 	return State
 end
