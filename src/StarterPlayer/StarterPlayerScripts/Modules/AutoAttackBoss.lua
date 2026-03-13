@@ -9,9 +9,10 @@ function AutoAttackBoss.run(State)
 	State.bossPriorityActive = State.bossPriorityActive or false
 	State.bossNextRunAt = State.bossNextRunAt or 0
 	State.autoNpcBusy = State.autoNpcBusy or false
+	State.bossImmediateRun = State.bossImmediateRun == nil and true or State.bossImmediateRun
 
 	print("State : ",State)
-	
+
 	local TweenService = game:GetService("TweenService")
 	local Players = game:GetService("Players")
 	local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -175,20 +176,26 @@ function AutoAttackBoss.run(State)
 
 		local now = os.time()
 
-		if State.bossNextRunAt == 0 or State.bossNextRunAt <= now then
-			State.bossNextRunAt = getNext5MinuteTimestamp()
-		end
-
-		if now >= (State.bossNextRunAt - PREPARE_BEFORE_BOSS) then
+		if State.bossImmediateRun then
+			print("Immediate first boss run")
+			State.bossImmediateRun = false
 			State.bossPriorityActive = true
 		else
-			State.bossPriorityActive = false
-			task.wait(0.2)
-			continue
-		end
+			if State.bossNextRunAt == 0 or State.bossNextRunAt <= now then
+				State.bossNextRunAt = getNext5MinuteTimestamp()
+			end
 
-		while getgenv().RobloxUIRunning and State.autoBoss and os.time() < State.bossNextRunAt do
-			task.wait(0.2)
+			if now >= (State.bossNextRunAt - PREPARE_BEFORE_BOSS) then
+				State.bossPriorityActive = true
+			else
+				State.bossPriorityActive = false
+				task.wait(0.2)
+				continue
+			end
+
+			while getgenv().RobloxUIRunning and State.autoBoss and os.time() < State.bossNextRunAt do
+				task.wait(0.2)
+			end
 		end
 
 		if not getgenv().RobloxUIRunning or not State.autoBoss then
