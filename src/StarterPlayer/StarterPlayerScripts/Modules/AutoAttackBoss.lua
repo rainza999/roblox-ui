@@ -3,6 +3,10 @@ local AutoAttackBoss = {}
 function AutoAttackBoss.run(State)
 	print("AutoAttackBoss started")
 
+	State = State or {}
+
+	print("State =", State)
+	
 	State.bossInProgress = State.bossInProgress or false
 	State.bossPriorityActive = State.bossPriorityActive or false
 	State.bossNextRunAt = State.bossNextRunAt or 0
@@ -133,11 +137,6 @@ function AutoAttackBoss.run(State)
 		end
 		noclip(false)
 		return false
-	end
-
-	local function getNext5MinuteTimestamp()
-		local now = os.time()
-		return now - (now % 300) + 300
 	end
 
 	local function waitUntil(ts)
@@ -293,6 +292,7 @@ function AutoAttackBoss.run(State)
 	end
 
 	print("AutoAttackBoss stopped")
+	return State
 end
 
 return AutoAttackBoss
