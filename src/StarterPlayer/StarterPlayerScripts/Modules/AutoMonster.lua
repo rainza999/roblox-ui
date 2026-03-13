@@ -571,23 +571,11 @@ function AutoMonster.run(State)
 			return false
 		end
 
-		local dist = (standPos - hrp.Position).Magnitude
-		local moved
-
-		-- ถ้าไกลมาก ค่อยบินแบบเดิม
-		-- if dist > REPATH_DISTANCE then
-		-- 	moved = flyTo(standPos)
-		-- else
-		-- 	-- ใกล้ ๆ เดินเส้นตรงพอ ไม่ต้องซับซ้อน
-		-- 	moved = tweenTo(standPos, 85)
-		-- end
-		moved = tweenTo(standPos, 60)
-
+		local moved = tweenTo(standPos, 85)
 		if not moved then
 			return false
 		end
 
-		-- ถ้ามอนย้ายหนีจริงค่อยให้ caller ตัดสินใจ re-path
 		if didTargetMoveTooFar(originalTargetPos, targetPart, 12) then
 			return false
 		end
@@ -665,7 +653,7 @@ function AutoMonster.run(State)
 		end
 
 		print("[AutoMonster] Move to staging for:", monsterName)
-		return flyTo(cfg.point)
+		return tweenTo(cfg.point, 60)
 	end
 
 	-- -------------------------------------------------
