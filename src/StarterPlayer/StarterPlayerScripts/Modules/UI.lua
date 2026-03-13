@@ -295,9 +295,9 @@ function UI.create(state)
 		return btn
 	end
 
-	local collapseBtn = createHeaderButton("—", -116, Color3.fromRGB(69, 93, 182))
-	local maxBtn = createHeaderButton("▢", -78, Color3.fromRGB(55, 138, 95))
-	local closeBtn = createHeaderButton("✕", -40, Color3.fromRGB(182, 63, 63))
+	local collapseBtn = createHeaderButton("_", -116, Color3.fromRGB(69, 93, 182))
+	local maxBtn = createHeaderButton("□", -78, Color3.fromRGB(55, 138, 95))
+	local closeBtn = createHeaderButton("X", -40, Color3.fromRGB(182, 63, 63))
 
 	local divider = Instance.new("Frame")
 	divider.Size = UDim2.new(1, -20, 0, 1)
@@ -1002,35 +1002,174 @@ function UI.create(state)
 		monsterSelect.close()
 	end
 
+	-- local function setCollapsed(collapsed)
+	-- 	isCollapsed = collapsed
+	-- 	closeAllDropdowns()
+
+	-- 	if collapsed then
+	-- 		contentHolder.Visible = false
+	-- 		frame:TweenSize(collapsedSize, Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.15, true)
+	-- 		collapseBtn.Text = "+"
+	-- 	else
+	-- 		contentHolder.Visible = true
+	-- 		frame:TweenSize(isMaximized and maximizedSize or expandedSize, Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.15, true)
+	-- 		collapseBtn.Text = "—"
+	-- 	end
+	-- end
+
+	local normalAnchor = Vector2.new(0.5, 0.5)
+	local collapsedAnchor = Vector2.new(0, 0.5)
+
 	local function setCollapsed(collapsed)
 		isCollapsed = collapsed
 		closeAllDropdowns()
 
 		if collapsed then
+			if not isMaximized then
+				storedPosition = frame.Position
+				storedSize = frame.Size
+			end
+
 			contentHolder.Visible = false
-			frame:TweenSize(collapsedSize, Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.15, true)
+
+			frame.AnchorPoint = collapsedAnchor
+			frame:TweenPosition(
+				UDim2.new(0, 12, 0.5, 0),
+				Enum.EasingDirection.Out,
+				Enum.EasingStyle.Quad,
+				0.15,
+				true
+			)
+			frame:TweenSize(
+				collapsedSize,
+				Enum.EasingDirection.Out,
+				Enum.EasingStyle.Quad,
+				0.15,
+				true
+			)
+
 			collapseBtn.Text = "+"
 		else
 			contentHolder.Visible = true
-			frame:TweenSize(isMaximized and maximizedSize or expandedSize, Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.15, true)
-			collapseBtn.Text = "—"
+
+			frame.AnchorPoint = normalAnchor
+
+			if isMaximized then
+				frame:TweenPosition(
+					UDim2.new(0.5, 0, 0.5, 0),
+					Enum.EasingDirection.Out,
+					Enum.EasingStyle.Quad,
+					0.15,
+					true
+				)
+				frame:TweenSize(
+					maximizedSize,
+					Enum.EasingDirection.Out,
+					Enum.EasingStyle.Quad,
+					0.15,
+					true
+				)
+			else
+				frame:TweenPosition(
+					storedPosition,
+					Enum.EasingDirection.Out,
+					Enum.EasingStyle.Quad,
+					0.15,
+					true
+				)
+				frame:TweenSize(
+					expandedSize,
+					Enum.EasingDirection.Out,
+					Enum.EasingStyle.Quad,
+					0.15,
+					true
+				)
+			end
+
+			collapseBtn.Text = "_"
 		end
 	end
+
+	-- local function setMaximized(maximized)
+	-- 	isMaximized = maximized
+	-- 	closeAllDropdowns()
+
+	-- 	if maximized then
+	-- 		storedPosition = frame.Position
+	-- 		storedSize = frame.Size
+	-- 		frame:TweenPosition(UDim2.new(0.5, 0, 0.5, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.15, true)
+	-- 		frame:TweenSize(maximizedSize, Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.15, true)
+	-- 		maxBtn.Text = "❐"
+	-- 	else
+	-- 		frame:TweenPosition(storedPosition, Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.15, true)
+	-- 		frame:TweenSize(isCollapsed and collapsedSize or expandedSize, Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.15, true)
+	-- 		maxBtn.Text = "▢"
+	-- 	end
+	-- end
 
 	local function setMaximized(maximized)
 		isMaximized = maximized
 		closeAllDropdowns()
 
 		if maximized then
-			storedPosition = frame.Position
-			storedSize = frame.Size
-			frame:TweenPosition(UDim2.new(0.5, 0, 0.5, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.15, true)
-			frame:TweenSize(maximizedSize, Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.15, true)
-			maxBtn.Text = "❐"
+			if not isCollapsed then
+				storedPosition = frame.Position
+				storedSize = frame.Size
+			end
+
+			frame.AnchorPoint = Vector2.new(0.5, 0.5)
+			frame:TweenPosition(
+				UDim2.new(0.5, 0, 0.5, 0),
+				Enum.EasingDirection.Out,
+				Enum.EasingStyle.Quad,
+				0.15,
+				true
+			)
+			frame:TweenSize(
+				maximizedSize,
+				Enum.EasingDirection.Out,
+				Enum.EasingStyle.Quad,
+				0.15,
+				true
+			)
+
+			maxBtn.Text = "[]"
 		else
-			frame:TweenPosition(storedPosition, Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.15, true)
-			frame:TweenSize(isCollapsed and collapsedSize or expandedSize, Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.15, true)
-			maxBtn.Text = "▢"
+			if isCollapsed then
+				frame.AnchorPoint = Vector2.new(0, 0.5)
+				frame:TweenPosition(
+					UDim2.new(0, 12, 0.5, 0),
+					Enum.EasingDirection.Out,
+					Enum.EasingStyle.Quad,
+					0.15,
+					true
+				)
+				frame:TweenSize(
+					collapsedSize,
+					Enum.EasingDirection.Out,
+					Enum.EasingStyle.Quad,
+					0.15,
+					true
+				)
+			else
+				frame.AnchorPoint = Vector2.new(0.5, 0.5)
+				frame:TweenPosition(
+					storedPosition,
+					Enum.EasingDirection.Out,
+					Enum.EasingStyle.Quad,
+					0.15,
+					true
+				)
+				frame:TweenSize(
+					expandedSize,
+					Enum.EasingDirection.Out,
+					Enum.EasingStyle.Quad,
+					0.15,
+					true
+				)
+			end
+
+			maxBtn.Text = "□"
 		end
 	end
 
@@ -1061,7 +1200,7 @@ function UI.create(state)
 	end
 
 	header.InputBegan:Connect(function(input)
-		if isMaximized then
+		if isMaximized or isCollapsed then
 			return
 		end
 
