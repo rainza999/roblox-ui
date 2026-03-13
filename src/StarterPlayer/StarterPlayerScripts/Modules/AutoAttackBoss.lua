@@ -16,6 +16,21 @@ function AutoAttackBoss.run(State)
 		return character, humanoid, hrp
 	end
 
+	-------------------------------------------------
+	-- Noclip
+	-------------------------------------------------
+
+	local function noclip(state)
+		local char = player.Character
+		if not char then return end
+
+		for _, v in pairs(char:GetDescendants()) do
+			if v:IsA("BasePart") then
+				v.CanCollide = not state
+			end
+		end
+	end
+
 	local function findCreatePartyStuff()
 		local createParty = workspace:FindFirstChild("CreateParty", true)
 		if not createParty then
@@ -70,6 +85,8 @@ function AutoAttackBoss.run(State)
 	local function followBoss(bossModel)
 		local _, humanoid, hrp = getCharacterParts()
 
+		noclip(true)
+
 		while getgenv().RobloxUIRunning and bossModel and bossModel.Parent do
 			if State and not State.autoBoss then
 				return false
@@ -104,7 +121,7 @@ function AutoAttackBoss.run(State)
 				_, humanoid, hrp = getCharacterParts()
 			end
 		end
-
+		noclip(false)
 		return false
 	end
 
@@ -154,9 +171,20 @@ function AutoAttackBoss.run(State)
 		if createParty and doorPart then
 			local cf = doorPart.CFrame
 			local dist = (cf.Position - hrp.Position).Magnitude
+			noclip(true)
+
 			local tween = TweenService:Create(hrp, TweenInfo.new(dist / 60), {CFrame = cf})
 			tween:Play()
-			tween.Completed:Wait()
+
+			while tween.PlaybackState == Enum.PlaybackState.Playing do
+				if not getgenv().RobloxUIRunning then
+					tween:Cancel()
+					break
+				end
+				task.wait()
+			end
+
+			noclip(false)
 
 			task.wait(0.5)
 

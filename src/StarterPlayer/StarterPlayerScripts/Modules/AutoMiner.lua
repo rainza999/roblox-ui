@@ -136,6 +136,66 @@ function AutoMiner.run(State)
 		return character, humanoid, hrp
 	end
 
+    local function getGroundYNear(position, ignoreList)
+        local rayParams = RaycastParams.new()
+        rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+        rayParams.FilterDescendantsInstances = ignoreList or {}
+        rayParams.IgnoreWater = true
+
+        local origin = position + Vector3.new(0, 25, 0)
+        local direction = Vector3.new(0, -200, 0)
+
+        local result = workspace:Raycast(origin, direction, rayParams)
+        if result then
+            return result.Position.Y
+        end
+
+        return nil
+    end
+
+    local function getSafeStandPositionNearTarget(targetPart, stopDistance)
+        local character, _, hrp = getCharacterParts()
+        if not targetPart or not targetPart.Parent then
+            return nil
+        end
+
+        local targetPos = targetPart.Position
+        local myPos = hrp.Position
+
+        local flatDir = Vector3.new(
+            targetPos.X - myPos.X,
+            0,
+            targetPos.Z - myPos.Z
+        )
+
+        if flatDir.Magnitude <= 0.05 then
+            flatDir = Vector3.new(0, 0, -1)
+        else
+            flatDir = flatDir.Unit
+        end
+
+        local desiredXZ = Vector3.new(
+            targetPos.X - flatDir.X * (stopDistance or 4),
+            0,
+            targetPos.Z - flatDir.Z * (stopDistance or 4)
+        )
+
+        local groundY = getGroundYNear(
+            Vector3.new(desiredXZ.X, targetPos.Y + 5, desiredXZ.Z),
+            {character, targetPart.Parent}
+        )
+
+        local finalY
+        if groundY then
+            finalY = groundY + 3
+        else
+            -- fallback ถ้าหาพื้นไม่เจอ
+            finalY = targetPos.Y + 2
+        end
+
+        return Vector3.new(desiredXZ.X, finalY, desiredXZ.Z)
+    end
+
     local function isPausedForAutoMiner()
         return ControllerLock.isOwnedByOther(State, "AutoMiner")
     end
@@ -205,22 +265,51 @@ function AutoMiner.run(State)
 	end
 
 	local function getMinerPart(model)
-		if not model then
-			return nil
-		end
+        if not model then
+            return nil
+        end
 
-		if model:IsA("BasePart") then
-			return model
-		end
+        if model:IsA("BasePart") then
+            return model
+        end
 
-		if model:IsA("Model") then
-			return model.PrimaryPart
-				or model:FindFirstChild("HumanoidRootPart")
-				or model:FindFirstChildWhichIsA("BasePart")
-		end
+        if model:IsA("Model") then
+            if model.PrimaryPart then
+                return model.PrimaryPart
+            end
 
-		return nil
-	end
+            local preferredNames = {
+                "HumanoidRootPart",
+                "RootPart",
+                "Main",
+                "Hitbox",
+                "Core"
+            }
+
+            for _, name in ipairs(preferredNames) do
+                local found = model:FindFirstChild(name, true)
+                if found and found:IsA("BasePart") then
+                    return found
+                end
+            end
+
+            local biggestPart = nil
+            local biggestSize = 0
+            for _, obj in ipairs(model:GetDescendants()) do
+                if obj:IsA("BasePart") then
+                    local sizeScore = obj.Size.X * obj.Size.Y * obj.Size.Z
+                    if sizeScore > biggestSize then
+                        biggestSize = sizeScore
+                        biggestPart = obj
+                    end
+                end
+            end
+
+            return biggestPart
+        end
+
+        return nil
+    end
 
 	local function getMinerHealth(mineral)
 		if not mineral or not mineral.Parent then
@@ -594,60 +683,46 @@ function AutoMiner.run(State)
 		return nearestMonster
 	end
 
-	local function moveToTargetPart(targetPart, stopDistance)
+    local function moveToTargetPart(targetPart, stopDistance)
         if isPausedForAutoMiner() then
             return false
         end
 
-        local _, _, hrp = getCharacterParts()
+        local character, _, hrp = getCharacterParts()
 
         if not targetPart or not targetPart.Parent then
             return false
         end
 
-        noclip(true)
-
-        local targetPos = targetPart.Position
-        local myPos = hrp.Position
-
-        local flatDir = Vector3.new(
-            targetPos.X - myPos.X,
-            0,
-            targetPos.Z - myPos.Z
-        )
-
-        if flatDir.Magnitude <= 0.05 then
-            return true
+        local desiredPos = getSafeStandPositionNearTarget(targetPart, stopDistance or 4)
+        if not desiredPos then
+            return false
         end
 
-        flatDir = flatDir.Unit
+        noclip(true)
 
-        local desiredPos = Vector3.new(
-            targetPos.X - flatDir.X * (stopDistance or 4),
-            myPos.Y,
-            targetPos.Z - flatDir.Z * (stopDistance or 4)
-        )
+        local lookAtPos = Vector3.new(targetPart.Position.X, desiredPos.Y, targetPart.Position.Z)
+        local desiredCF = CFrame.lookAt(desiredPos, lookAtPos)
 
-        local desiredCF = CFrame.lookAt(desiredPos, Vector3.new(targetPos.X, desiredPos.Y, targetPos.Z))
-        local dist = (desiredPos - myPos).Magnitude
-
+        local dist = (desiredPos - hrp.Position).Magnitude
         local tween = TweenService:Create(
             hrp,
             TweenInfo.new(math.max(dist / 60, 0.05), Enum.EasingStyle.Linear),
             { CFrame = desiredCF }
         )
+
         tween:Play()
 
         while tween.PlaybackState == Enum.PlaybackState.Playing do
             if isPausedForAutoMiner() then
-                noclip(false)
                 tween:Cancel()
+                noclip(false)
                 return false
             end
 
             if not targetPart or not targetPart.Parent then
-                noclip(false)
                 tween:Cancel()
+                noclip(false)
                 return false
             end
 
@@ -655,7 +730,6 @@ function AutoMiner.run(State)
         end
 
         noclip(false)
-
         return not isPausedForAutoMiner()
     end
 
@@ -678,50 +752,56 @@ function AutoMiner.run(State)
     end
 
     local function stickToTargetPart(targetPart, stickDistance)
-		local character, humanoid, hrp = getCharacterParts()
-		if not targetPart or not targetPart.Parent then
-			return false
-		end
+        local character, _, hrp = getCharacterParts()
+        if not targetPart or not targetPart.Parent then
+            return false
+        end
 
-		local targetPos = targetPart.Position
-		local myPos = hrp.Position
-		local dist = (targetPos - myPos).Magnitude
-		local desiredDistance = stickDistance or 2.2
+        local targetPos = targetPart.Position
+        local myPos = hrp.Position
+        local desiredDistance = stickDistance or 2.2
 
-		-- ถ้าอยู่ใกล้อยู่แล้ว แค่หันหน้า
-		if dist <= desiredDistance + 0.35 then
-			faceTargetPart(targetPart)
-			return true
-		end
+        local flatDir = Vector3.new(
+            targetPos.X - myPos.X,
+            0,
+            targetPos.Z - myPos.Z
+        )
 
-		local flatDir = Vector3.new(
-			targetPos.X - myPos.X,
-			0,
-			targetPos.Z - myPos.Z
-		)
+        if flatDir.Magnitude <= 0.05 then
+            faceTargetPart(targetPart)
+            return true
+        end
 
-		if flatDir.Magnitude <= 0.05 then
-			faceTargetPart(targetPart)
-			return true
-		end
+        flatDir = flatDir.Unit
 
-		flatDir = flatDir.Unit
+        local desiredXZ = Vector3.new(
+            targetPos.X - flatDir.X * desiredDistance,
+            0,
+            targetPos.Z - flatDir.Z * desiredDistance
+        )
 
-		-- ขยับให้ไปชิดแร่ แต่ยังไม่ทับจุดเดียวกันเป๊ะ
-		local desiredPos = Vector3.new(
-			targetPos.X - flatDir.X * desiredDistance,
-			myPos.Y,
-			targetPos.Z - flatDir.Z * desiredDistance
-		)
+        local groundY = getGroundYNear(
+            Vector3.new(desiredXZ.X, targetPos.Y + 5, desiredXZ.Z),
+            {character, targetPart.Parent}
+        )
 
-		noclip(true)
-		hrp.CFrame = CFrame.lookAt(
-			desiredPos,
-			Vector3.new(targetPos.X, desiredPos.Y, targetPos.Z)
-		)
+        local finalY
+        if groundY then
+            finalY = groundY + 3
+        else
+            finalY = math.max(myPos.Y, targetPos.Y)
+        end
 
-		return true
-	end
+        local desiredPos = Vector3.new(desiredXZ.X, finalY, desiredXZ.Z)
+
+        noclip(true)
+        hrp.CFrame = CFrame.lookAt(
+            desiredPos,
+            Vector3.new(targetPos.X, desiredPos.Y, targetPos.Z)
+        )
+
+        return true
+    end
 
     -------------------------------------------------
 	-- Mineral Highlight
@@ -1041,15 +1121,25 @@ function AutoMiner.run(State)
 	end
 
 	local function moveToMiner(mineral)
-		local targetPart = getMinerPart(mineral)
-		if not targetPart then
-			return false
-		end
-        
+        local targetPart = getMinerPart(mineral)
+        if not targetPart then
+            return false
+        end
+
+        local _, _, hrp = getCharacterParts()
+        local yDiff = math.abs(targetPart.Position.Y - hrp.Position.Y)
+
+        if yDiff > 40 then
+            warn("[AutoMiner] Skip mineral due to huge Y difference:", mineral.Name, yDiff)
+            return false
+        end
+
         local moved = moveToTargetPart(targetPart, 4)
-        faceTargetPart(targetPart)
+        if moved then
+            faceTargetPart(targetPart)
+        end
         return moved
-	end
+    end
 
 	local function mineTarget(mineral)
 		local timeout = tick() + 60
