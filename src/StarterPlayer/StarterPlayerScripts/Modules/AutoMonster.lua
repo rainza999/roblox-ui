@@ -21,46 +21,35 @@ function AutoMonster.run(State)
 	local ATTACK_RANGE = 8
 	local STOP_DISTANCE = 4
 	local SEARCH_DISTANCE = math.huge
-	local MOVE_SPEED = 85
+	local MOVE_SPEED = 60
 	local SAFE_FLY_HEIGHT = 160
 	local REPATH_DISTANCE = 18
 
 	local STAGING_POINT = Vector3.new(389, 138, 93)
 	local STAGING_RADIUS = 8
 
-	local function getMonsterPriorityBuckets()
-		return {
-			"hellflame oni",
-			"warlord oni",
-			"frostburn oni",
-			"brute oni",
-			"common orc",
-			"elite orc",
-			"monk panda",
-			"samurai ape",
-			"savage ape",
-			"mountain ape",
-			"chuthlu",
-			"skeleton pirate",
-			"yeti",
-			"crystal spider",
-			"diamond spider",
-			"prismarine spider",
-		}
-	end
+	local STAGING_CONFIG = {
+		["common orc"] = {
+			enabled = true,
+			point = Vector3.new(389, 138, 93),
+			radius = 8,
+		},
+		["elite orc"] = {
+			enabled = true,
+			point = Vector3.new(389, 138, 93),
+			radius = 8,
+		},
+		-- ตัวอย่างเผื่ออนาคต
+		-- ["hellflame oni"] = {
+		-- 	enabled = true,
+		-- 	point = Vector3.new(389, 138, 93),
+		-- 	radius = 8,
+		-- },
+	}
 
-	local function getMonsterPriorityIndex(monsterName)
-		local normalized = normalizeName(monsterName)
-		local buckets = getMonsterPriorityBuckets()
-
-		for i, name in ipairs(buckets) do
-			if normalized == name then
-				return i
-			end
-		end
-
-		return math.huge
-	end
+	local STUCK_CHECK_INTERVAL = 0.25
+	local STUCK_DISTANCE_EPSILON = 1.2
+	local STUCK_MAX_COUNT = 4
 	-------------------------------------------------
 	-- Character
 	-------------------------------------------------
@@ -122,6 +111,40 @@ function AutoMonster.run(State)
 		return string.lower(name)
 	end
 
+	local function getMonsterPriorityBuckets()
+		return {
+			"hellflame oni",
+			"warlord oni",
+			"frostburn oni",
+			"brute oni",
+			"common orc",
+			"elite orc",
+			"monk panda",
+			"samurai ape",
+			"savage ape",
+			"mountain ape",
+			"chuthlu",
+			"skeleton pirate",
+			"yeti",
+			"crystal spider",
+			"diamond spider",
+			"prismarine spider",
+		}
+	end
+
+	local function getMonsterPriorityIndex(monsterName)
+		local normalized = normalizeName(monsterName)
+		local buckets = getMonsterPriorityBuckets()
+
+		for i, name in ipairs(buckets) do
+			if normalized == name then
+				return i
+			end
+		end
+
+		return math.huge
+	end
+
 	local function isSelectedMonster(monsterName)
 		if not State.selectedMonsters then
 			return false
@@ -138,10 +161,13 @@ function AutoMonster.run(State)
 		return false
 	end
 
-	local function requiresStaging(monsterName)
+	local function getStagingConfig(monsterName)
 		local n = normalizeName(monsterName)
-		return n:find("common orc", 1, true)
-			or n:find("elite orc", 1, true)
+		local cfg = STAGING_CONFIG[n]
+		if cfg and cfg.enabled then
+			return cfg
+		end
+		return nil
 	end
 
 	-------------------------------------------------
@@ -326,7 +352,8 @@ function AutoMonster.run(State)
 		cancelTween()
 		startNoclip()
 
-		local dist = (pos - hrp.Position).Magnitude
+		local startPos = hrp.Position
+		local dist = (pos - startPos).Magnitude
 		local time = math.max(dist / speed, 0.05)
 
 		local tween = TweenService:Create(
@@ -339,6 +366,9 @@ function AutoMonster.run(State)
 		tween:Play()
 
 		local startedAt = tick()
+		local lastCheckAt = tick()
+		local lastCheckPos = hrp.Position
+		local stuckCount = 0
 
 		while tween.PlaybackState == Enum.PlaybackState.Playing do
 			if not getgenv().RobloxUIRunning or not State.autoMonsterFarm then
@@ -358,12 +388,32 @@ function AutoMonster.run(State)
 				break
 			end
 
+			if tick() - lastCheckAt >= STUCK_CHECK_INTERVAL then
+				local movedDist = (hrp.Position - lastCheckPos).Magnitude
+
+				if movedDist <= STUCK_DISTANCE_EPSILON then
+					stuckCount += 1
+					if stuckCount >= STUCK_MAX_COUNT then
+						warn("[AutoMonster] Stuck detected during tween")
+						tween:Cancel()
+						stopNoclip()
+						return false
+					end
+				else
+					stuckCount = 0
+				end
+
+				lastCheckPos = hrp.Position
+				lastCheckAt = tick()
+			end
+
 			task.wait()
 		end
 
 		activeTween = nil
 		stopNoclip()
-		return true
+
+		return (hrp.Position - pos).Magnitude <= 8
 	end
 
 	local function flyTo(targetPos)
@@ -448,6 +498,19 @@ function AutoMonster.run(State)
 		return Vector3.new(desiredXZ.X, finalY, desiredXZ.Z)
 	end
 
+	local function isTargetStillValid(targetPart)
+		return targetPart and targetPart.Parent ~= nil
+	end
+
+	local function didTargetMoveTooFar(originalTargetPos, targetPart, threshold)
+		if not isTargetStillValid(targetPart) then
+			return true
+		end
+
+		threshold = threshold or 10
+		return (targetPart.Position - originalTargetPos).Magnitude > threshold
+	end
+
 	local function moveToTargetPart(targetPart, stopDistance)
 		if isPausedForAutoMonster() or isBossPriorityActive() then
 			return false
@@ -458,18 +521,33 @@ function AutoMonster.run(State)
 		end
 
 		local _, _, hrp = getCharacterParts()
+		local originalTargetPos = targetPart.Position
+
 		local standPos = getSafeStandPositionNearTarget(targetPart, stopDistance or STOP_DISTANCE)
 		if not standPos then
 			return false
 		end
 
 		local dist = (standPos - hrp.Position).Magnitude
+		local moved
 
 		if dist > REPATH_DISTANCE then
-			return flyTo(standPos)
+			moved = flyTo(standPos)
 		else
-			return tweenTo(standPos, 80)
+			moved = tweenTo(standPos, 80)
 		end
+
+		if not moved then
+			return false
+		end
+
+		-- fallback: ถ้ามอนขยับแรงระหว่างเราวิ่งมา ให้ caller ตัดสินใจ re-path อีกรอบ
+		if didTargetMoveTooFar(originalTargetPos, targetPart, 10) then
+			warn("[AutoMonster] Target moved too far during movement")
+			return false
+		end
+
+		return true
 	end
 
 	local function stickToTargetPart(targetPart, stickDistance)
@@ -521,55 +599,65 @@ function AutoMonster.run(State)
 	-------------------------------------------------
 	-- Staging
 	-------------------------------------------------
-	local function isAtStaging()
-		local _, _, hrp = getCharacterParts()
-		return (hrp.Position - STAGING_POINT).Magnitude <= STAGING_RADIUS
-	end
-
-	local function moveToStaging()
-		if isAtStaging() then
+	local function isAtStagingFor(monsterName)
+		local cfg = getStagingConfig(monsterName)
+		if not cfg then
 			return true
 		end
 
-		print("[AutoMonster] Move to staging")
-		return flyTo(STAGING_POINT)
-	end
-
-	-------------------------------------------------
-	-- Find targets
-	-------------------------------------------------
-	local function getTargetMonsters()
-		local living = workspace:FindFirstChild("Living")
-		if not living then
-			return {}
-		end
-
 		local _, _, hrp = getCharacterParts()
-		local monsters = {}
+		return (hrp.Position - cfg.point).Magnitude <= (cfg.radius or 8)
+	end
 
-		for _, mob in ipairs(living:GetChildren()) do
-			if mob:IsA("Model") and isMonsterAlive(mob) then
-				local part = findMonsterRoot(mob)
-				if part and isSelectedMonster(mob.Name) then
-					local dist = (part.Position - hrp.Position).Magnitude
-					if dist <= SEARCH_DISTANCE then
-						table.insert(monsters, {
-							model = mob,
-							part = part,
-							dist = dist,
-							name = normalizeName(mob.Name),
-						})
-					end
-				end
-			end
+	local function moveToStagingFor(monsterName)
+		local cfg = getStagingConfig(monsterName)
+		if not cfg then
+			return true
 		end
 
-		table.sort(monsters, function(a, b)
-			return a.dist < b.dist
-		end)
+		if isAtStagingFor(monsterName) then
+			return true
+		end
 
-		return monsters
+		print("[AutoMonster] Move to staging for:", monsterName)
+		return flyTo(cfg.point)
 	end
+
+	-- -------------------------------------------------
+	-- -- Find targets
+	-- -------------------------------------------------
+	-- local function getTargetMonsters()
+	-- 	local living = workspace:FindFirstChild("Living")
+	-- 	if not living then
+	-- 		return {}
+	-- 	end
+
+	-- 	local _, _, hrp = getCharacterParts()
+	-- 	local monsters = {}
+
+	-- 	for _, mob in ipairs(living:GetChildren()) do
+	-- 		if mob:IsA("Model") and isMonsterAlive(mob) then
+	-- 			local part = findMonsterRoot(mob)
+	-- 			if part and isSelectedMonster(mob.Name) then
+	-- 				local dist = (part.Position - hrp.Position).Magnitude
+	-- 				if dist <= SEARCH_DISTANCE then
+	-- 					table.insert(monsters, {
+	-- 						model = mob,
+	-- 						part = part,
+	-- 						dist = dist,
+	-- 						name = normalizeName(mob.Name),
+	-- 					})
+	-- 				end
+	-- 			end
+	-- 		end
+	-- 	end
+
+	-- 	table.sort(monsters, function(a, b)
+	-- 		return a.dist < b.dist
+	-- 	end)
+
+	-- 	return monsters
+	-- end
 
 	local function findNearestTargetMonster()
 		local living = workspace:FindFirstChild("Living")
@@ -647,15 +735,19 @@ function AutoMonster.run(State)
 		end
 
 		local monsterName = monster.Name
-		if requiresStaging(monsterName) and not isAtStaging() then
+		local stagingCfg = getStagingConfig(monsterName)
+
+		if stagingCfg and not isAtStagingFor(monsterName) then
 			print("[AutoMonster] target requires staging:", monsterName)
-			local ok = moveToStaging()
+			local ok = moveToStagingFor(monsterName)
 			if not ok then
 				return false
 			end
 		end
 
 		local timeout = tick() + 20
+		local repathFailures = 0
+		local maxRepathFailures = 3
 
 		while getgenv().RobloxUIRunning and State.autoMonsterFarm and monster and monster.Parent and tick() < timeout do
 			if isPausedForAutoMonster() or isBossPriorityActive() then
@@ -680,9 +772,17 @@ function AutoMonster.run(State)
 			if dist > ATTACK_RANGE then
 				local moved = moveToTargetPart(part, STOP_DISTANCE)
 				if not moved then
-					cancelTween()
-					return false
+					repathFailures += 1
+					if repathFailures >= maxRepathFailures then
+						warn("[AutoMonster] Too many repath failures:", monster.Name)
+						cancelTween()
+						return false
+					end
+					task.wait(0.08)
+					continue
 				end
+
+				repathFailures = 0
 
 				part = findMonsterRoot(monster)
 				if not part then
@@ -700,6 +800,25 @@ function AutoMonster.run(State)
 				cancelTween()
 				return true
 			end
+
+			local _, _, hrp2 = getCharacterParts()
+			local part2 = findMonsterRoot(monster)
+			if not part2 then
+				cancelTween()
+				return true
+			end
+
+			local dist2 = (part2.Position - hrp2.Position).Magnitude
+			if dist2 > 20 then
+				repathFailures += 1
+				if repathFailures >= maxRepathFailures then
+					warn("[AutoMonster] Target keeps drifting away:", monster.Name)
+					cancelTween()
+					return false
+				end
+			else
+				repathFailures = 0
+			end
 		end
 
 		cancelTween()
@@ -715,6 +834,7 @@ function AutoMonster.run(State)
 		if isPausedForAutoMonster() then
 			cancelTween()
 			clearRedTarget()
+			clearBlueHighlights()
 			task.wait(0.1)
 			continue
 		end
@@ -723,6 +843,7 @@ function AutoMonster.run(State)
 			ControllerLock.release(State, "AutoMonster")
 			cancelTween()
 			clearRedTarget()
+			clearBlueHighlights()
 			task.wait(0.1)
 			continue
 		end
