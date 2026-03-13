@@ -128,7 +128,7 @@ function PotionManager.run(State)
 			return false
 		end
 
-		speed = speed or 100
+		speed = speed or 60
 		local distance = (hrp.Position - targetPos).Magnitude
 		local duration = math.max(distance / speed, 0.15)
 
@@ -254,7 +254,7 @@ function PotionManager.run(State)
             return true
         end
 
-        local ok = tweenToPosition(movePos, 100)
+        local ok = tweenToPosition(movePos, 60)
         if not ok then
             warn("[PotionShop] tween failed for", toolName)
             return false
