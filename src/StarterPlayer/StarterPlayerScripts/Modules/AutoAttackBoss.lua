@@ -17,6 +17,10 @@ function AutoAttackBoss.run(State)
 
 	local player = Players.LocalPlayer
 
+	local function getCharacter()
+		return player.Character or player.CharacterAdded:Wait()
+	end
+
 	local function getCharacterParts()
 		local character = player.Character or player.CharacterAdded:Wait()
 		local humanoid = character:WaitForChild("Humanoid")
@@ -105,8 +109,34 @@ function AutoAttackBoss.run(State)
 		return nil
 	end
 
-	local function attack()
-		pcall(function()
+	local function hasEquippedWeapon()
+		local character = getCharacter()
+
+		return character:FindFirstChild("Weapon")
+			or character:FindFirstChild("WeaponModel")
+	end
+
+    local function waitForEquippedObject(checkFn, timeout)
+		local deadline = tick() + (timeout or 2)
+
+		while tick() < deadline do
+			local obj = checkFn()
+			if obj then
+				return obj
+			end
+			task.wait(0.05)
+		end
+
+		return nil
+	end
+	
+	local function ensureWeaponEquipped()
+		local already = hasEquippedWeapon()
+		if already then
+			return true
+		end
+
+		local ok, err = pcall(function()
 			ReplicatedStorage
 				:WaitForChild("Shared")
 				:WaitForChild("Packages")
@@ -117,12 +147,49 @@ function AutoAttackBoss.run(State)
 				:WaitForChild("ToolActivated")
 				:InvokeServer("Weapon")
 		end)
+
+		if not ok then
+			warn("[AutoAttackBoss] Equip failed:", err)
+			return false
+		end
+
+		local equipped = waitForEquippedObject(hasEquippedWeapon, 2)
+		if equipped then
+			print("[AutoAttackBoss] Weapon equipped:", equipped.Name)
+			return true
+		end
+
+		warn("[AutoAttackBoss] Weapon not found after ToolActivated")
+		return false
+	end
+
+	local function attack()
+		local ok, err = pcall(function()
+			ReplicatedStorage
+				:WaitForChild("Shared")
+				:WaitForChild("Packages")
+				:WaitForChild("Knit")
+				:WaitForChild("Services")
+				:WaitForChild("ToolService")
+				:WaitForChild("RF")
+				:WaitForChild("ToolActivated")
+				:InvokeServer("Weapon")
+		end)
+
+		if not ok then
+			warn("[AutoAttackBoss] Attack failed:", err)
+			return false
+		end
+
+		return true
 	end
 
 	local function followBoss(bossModel)
 		local _, humanoid, hrp = getCharacterParts()
 		noclip(true)
 
+		ensureWeaponEquipped()
+		
 		while getgenv().RobloxUIRunning and bossModel and bossModel.Parent do
 			if State and not State.autoBoss then
 				noclip(false)
@@ -151,6 +218,14 @@ function AutoAttackBoss.run(State)
 
 			local look = Vector3.new(bossHrp.Position.X, hrp.Position.Y, bossHrp.Position.Z)
 			hrp.CFrame = CFrame.lookAt(hrp.Position, look)
+
+			if not hasEquippedWeapon() then
+				local equipped = ensureWeaponEquipped()
+				if not equipped then
+					task.wait(0.2)
+					continue
+				end
+			end
 
 			attack()
 			task.wait(0.2)

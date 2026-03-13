@@ -53,6 +53,11 @@ function AutoMonster.run(State)
 	-------------------------------------------------
 	-- Character
 	-------------------------------------------------
+
+	local function getCharacter()
+		return player.Character or player.CharacterAdded:Wait()
+	end
+
 	local function getCharacterParts()
 		local character = player.Character or player.CharacterAdded:Wait()
 		local humanoid = character:WaitForChild("Humanoid")
@@ -80,6 +85,62 @@ function AutoMonster.run(State)
 			return true
 		end
 
+		return false
+	end
+
+	-------------------------------------------------
+
+	local function hasEquippedWeapon()
+		local character = getCharacter()
+
+		return character:FindFirstChild("Weapon")
+			or character:FindFirstChild("WeaponModel")
+	end
+
+	local function waitForEquippedObject(checkFn, timeout)
+		local deadline = tick() + (timeout or 2)
+
+		while tick() < deadline do
+			local obj = checkFn()
+			if obj then
+				return obj
+			end
+			task.wait(0.05)
+		end
+
+		return nil
+	end
+
+	local function ensureWeaponEquipped()
+		local already = hasEquippedWeapon()
+		if already then
+			return true
+		end
+
+		local ok, err = pcall(function()
+			ReplicatedStorage
+				:WaitForChild("Shared")
+				:WaitForChild("Packages")
+				:WaitForChild("Knit")
+				:WaitForChild("Services")
+				:WaitForChild("ToolService")
+				:WaitForChild("RF")
+				:WaitForChild("ToolActivated")
+				:InvokeServer("Weapon")
+		end)
+
+		if not ok then
+			warn("[AutoMonster] Equip failed:", err)
+			return false
+		end
+
+		local equipped = waitForEquippedObject(hasEquippedWeapon, 2)
+		if equipped then
+			print("[AutoMonster] Weapon equipped:", equipped.Name)
+			return true
+		end
+
+		warn("[AutoMonster] Weapon not found after ToolActivated")
 		return false
 	end
 
@@ -789,6 +850,8 @@ function AutoMonster.run(State)
 		local repathFailures = 0
 		local maxRepathFailures = 3
 
+		ensureWeaponEquipped()
+		
 		local REPOSITION_TRIGGER = ATTACK_RANGE + 2     -- เกินนี้ค่อยขยับใหม่
 		local HARD_REPATH_TRIGGER = 16                  -- ไกลมาก = วิ่งเข้าใหม่ชัดเจน
 
@@ -830,6 +893,14 @@ function AutoMonster.run(State)
 				task.wait(0.05)
 			else
 				-- อยู่ในระยะตีแล้ว: หันหน้า + ตี อย่างเดียว
+				if not hasEquippedWeapon() then
+					local equipped = ensureWeaponEquipped()
+					if not equipped then
+						task.wait(0.12)
+						continue
+					end
+				end
+				
 				faceTarget(part.Position)
 				attack()
 				task.wait(0.12)
