@@ -36,7 +36,7 @@ local AutoAttackBoss = loadModule("AutoAttackBoss")
 local AutoMiner = loadModule("AutoMiner")
 local AutoMonster = loadModule("AutoMonster")
 local PotionManager = loadModule("PotionManager")
-local AutoNPC = loadModule("AutoNPC")
+-- local AutoNPC = loadModule("AutoNPC")
 
 -- start systems once
 task.spawn(function()
@@ -47,9 +47,9 @@ task.spawn(function()
 	PotionManager.run(State)
 end)
 
-task.spawn(function()
-	AutoNPC.run(State)
-end)
+-- task.spawn(function()
+-- 	AutoNPC.run(State)
+-- end)
 
 task.spawn(function()
 	AutoAttackBoss.run(State)
