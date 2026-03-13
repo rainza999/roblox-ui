@@ -178,11 +178,20 @@ function AutoMonster.run(State)
 			return nil
 		end
 
-		return model:FindFirstChild("HumanoidRootPart", true)
-			or model:FindFirstChild("RootPart", true)
-			or model:FindFirstChild("Torso", true)
-			or model.PrimaryPart
-			or model:FindFirstChildWhichIsA("BasePart", true)
+		local candidates = {
+			model:FindFirstChild("HumanoidRootPart", true),
+			model:FindFirstChild("RootPart", true),
+			model:FindFirstChild("Torso", true),
+			model.PrimaryPart,
+		}
+
+		for _, obj in ipairs(candidates) do
+			if obj and obj:IsA("BasePart") then
+				return obj
+			end
+		end
+
+		return model:FindFirstChildWhichIsA("BasePart", true)
 	end
 
 	local function findMonsterHumanoid(model)
@@ -704,7 +713,7 @@ function AutoMonster.run(State)
 		for _, mob in ipairs(living:GetChildren()) do
 			if mob:IsA("Model") and isMonsterAlive(mob) and isSelectedMonster(mob.Name) then
 				local part = findMonsterRoot(mob)
-				if part then
+				if part and part:IsA("BasePart") then
 					local dist = (part.Position - hrp.Position).Magnitude
 					if dist <= SEARCH_DISTANCE then
 						local priority = getMonsterPriorityIndex(mob.Name)
@@ -795,7 +804,7 @@ function AutoMonster.run(State)
 			end
 
 			local part = findMonsterRoot(monster)
-			if not part then
+			if not part or not part:IsA("BasePart") then
 				cancelTween()
 				return true
 			end
@@ -833,7 +842,7 @@ function AutoMonster.run(State)
 
 			local _, _, hrp2 = getCharacterParts()
 			local part2 = findMonsterRoot(monster)
-			if not part2 then
+			if not part2 or not part2:IsA("BasePart") then
 				cancelTween()
 				return true
 			end
