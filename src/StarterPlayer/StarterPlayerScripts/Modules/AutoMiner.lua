@@ -800,7 +800,7 @@ function AutoMiner.run(State)
             desiredPos,
             Vector3.new(targetPos.X, desiredPos.Y, targetPos.Z)
         )
-
+        noclip(false)
         return true
     end
 
@@ -1185,8 +1185,19 @@ function AutoMiner.run(State)
             end
 
 			-- ระหว่างทุบให้เกาะแร่ตลอด
-			-- stickToTargetPart(targetPart, 2.2)
+            stickToTargetPart(targetPart, 2.2)
 
+            local realDist = (targetPart.Position - hrp.Position).Magnitude
+            if realDist > 8 then
+                stickToTargetPart(targetPart, 2.2)
+                task.wait(0.05)
+                continue
+            end
+
+            stickToTargetPart(targetPart, 2.2)
+            faceTargetPart(targetPart)
+            mining()
+            task.wait(0.12)
             if oreMode then
 				local oreSpawned = hasAnyOreSpawned(mineral)
 
@@ -1206,12 +1217,19 @@ function AutoMiner.run(State)
 				return false
 			end
 
-            -- stickToTargetPart(targetPart, 2.2)
+            stickToTargetPart(targetPart, 2.2)
+
             local realDist = (targetPart.Position - hrp.Position).Magnitude
             if realDist > 8 then
-                task.wait(0.1)
+                stickToTargetPart(targetPart, 2.2)
+                task.wait(0.05)
                 continue
             end
+
+            stickToTargetPart(targetPart, 2.2)
+            faceTargetPart(targetPart)
+            mining()
+            task.wait(0.12)
 
 			faceTargetPart(targetPart)
 			mining()
