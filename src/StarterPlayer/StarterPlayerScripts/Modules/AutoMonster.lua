@@ -462,14 +462,15 @@ function AutoMonster.run(State)
 		return nil
 	end
 
-	local function getSafeStandPositionNearTarget(targetPart, stopDistance)
-		local character, _, hrp = getCharacterParts()
+	local function getApproachPosition(targetPart, stopDistance)
+		local _, _, hrp = getCharacterParts()
 		if not targetPart or not targetPart.Parent then
 			return nil
 		end
 
 		local targetPos = targetPart.Position
 		local myPos = hrp.Position
+		local desiredDistance = stopDistance or STOP_DISTANCE
 
 		local flatDir = Vector3.new(
 			targetPos.X - myPos.X,
@@ -484,19 +485,61 @@ function AutoMonster.run(State)
 		end
 
 		local desiredXZ = Vector3.new(
-			targetPos.X - flatDir.X * (stopDistance or STOP_DISTANCE),
+			targetPos.X - flatDir.X * desiredDistance,
 			0,
-			targetPos.Z - flatDir.Z * (stopDistance or STOP_DISTANCE)
+			targetPos.Z - flatDir.Z * desiredDistance
 		)
 
+		-- เอา Y ของตัวเราเป็นหลัก เพื่อลดอาการเด้งขึ้นหัวมอน
+		local desiredY = myPos.Y
+
+		-- ถ้ามีพื้นค่อยอิงพื้นแบบเบา ๆ
 		local groundY = getGroundYNear(
-			Vector3.new(desiredXZ.X, targetPos.Y + 8, desiredXZ.Z),
-			{character, targetPart.Parent}
+			Vector3.new(desiredXZ.X, math.max(targetPos.Y, myPos.Y) + 8, desiredXZ.Z),
+			{player.Character, targetPart.Parent}
 		)
 
-		local finalY = groundY and (groundY + 3) or (targetPos.Y + 2)
-		return Vector3.new(desiredXZ.X, finalY, desiredXZ.Z)
+		if groundY then
+			desiredY = groundY + 2.5
+		end
+
+		return Vector3.new(desiredXZ.X, desiredY, desiredXZ.Z)
 	end
+	-- local function getSafeStandPositionNearTarget(targetPart, stopDistance)
+	-- 	local character, _, hrp = getCharacterParts()
+	-- 	if not targetPart or not targetPart.Parent then
+	-- 		return nil
+	-- 	end
+
+	-- 	local targetPos = targetPart.Position
+	-- 	local myPos = hrp.Position
+
+	-- 	local flatDir = Vector3.new(
+	-- 		targetPos.X - myPos.X,
+	-- 		0,
+	-- 		targetPos.Z - myPos.Z
+	-- 	)
+
+	-- 	if flatDir.Magnitude <= 0.05 then
+	-- 		flatDir = Vector3.new(0, 0, -1)
+	-- 	else
+	-- 		flatDir = flatDir.Unit
+	-- 	end
+
+	-- 	local desiredXZ = Vector3.new(
+	-- 		targetPos.X - flatDir.X * (stopDistance or STOP_DISTANCE),
+	-- 		0,
+	-- 		targetPos.Z - flatDir.Z * (stopDistance or STOP_DISTANCE)
+	-- 	)
+
+	-- 	local groundY = getGroundYNear(
+	-- 		Vector3.new(desiredXZ.X, targetPos.Y + 8, desiredXZ.Z),
+	-- 		{character, targetPart.Parent}
+	-- 	)
+
+	-- 	local finalY = groundY and (groundY + 3) or (targetPos.Y + 2)
+	-- 	return Vector3.new(desiredXZ.X, finalY, desiredXZ.Z)
+	-- end
 
 	local function isTargetStillValid(targetPart)
 		return targetPart and targetPart.Parent ~= nil
@@ -523,7 +566,7 @@ function AutoMonster.run(State)
 		local _, _, hrp = getCharacterParts()
 		local originalTargetPos = targetPart.Position
 
-		local standPos = getSafeStandPositionNearTarget(targetPart, stopDistance or STOP_DISTANCE)
+		local standPos = getApproachPosition(targetPart, stopDistance or STOP_DISTANCE)
 		if not standPos then
 			return false
 		end
@@ -531,70 +574,72 @@ function AutoMonster.run(State)
 		local dist = (standPos - hrp.Position).Magnitude
 		local moved
 
-		if dist > REPATH_DISTANCE then
-			moved = flyTo(standPos)
-		else
-			moved = tweenTo(standPos, 80)
-		end
+		-- ถ้าไกลมาก ค่อยบินแบบเดิม
+		-- if dist > REPATH_DISTANCE then
+		-- 	moved = flyTo(standPos)
+		-- else
+		-- 	-- ใกล้ ๆ เดินเส้นตรงพอ ไม่ต้องซับซ้อน
+		-- 	moved = tweenTo(standPos, 85)
+		-- end
+		moved = tweenTo(standPos, 60)
 
 		if not moved then
 			return false
 		end
 
-		-- fallback: ถ้ามอนขยับแรงระหว่างเราวิ่งมา ให้ caller ตัดสินใจ re-path อีกรอบ
-		if didTargetMoveTooFar(originalTargetPos, targetPart, 10) then
-			warn("[AutoMonster] Target moved too far during movement")
+		-- ถ้ามอนย้ายหนีจริงค่อยให้ caller ตัดสินใจ re-path
+		if didTargetMoveTooFar(originalTargetPos, targetPart, 12) then
 			return false
 		end
 
 		return true
 	end
 
-	local function stickToTargetPart(targetPart, stickDistance)
-		local character, _, hrp = getCharacterParts()
-		if not targetPart or not targetPart.Parent then
-			return false
-		end
+	-- local function stickToTargetPart(targetPart, stickDistance)
+	-- 	local character, _, hrp = getCharacterParts()
+	-- 	if not targetPart or not targetPart.Parent then
+	-- 		return false
+	-- 	end
 
-		local targetPos = targetPart.Position
-		local myPos = hrp.Position
-		local desiredDistance = stickDistance or 2.5
+	-- 	local targetPos = targetPart.Position
+	-- 	local myPos = hrp.Position
+	-- 	local desiredDistance = stickDistance or 2.5
 
-		local flatDir = Vector3.new(
-			targetPos.X - myPos.X,
-			0,
-			targetPos.Z - myPos.Z
-		)
+	-- 	local flatDir = Vector3.new(
+	-- 		targetPos.X - myPos.X,
+	-- 		0,
+	-- 		targetPos.Z - myPos.Z
+	-- 	)
 
-		if flatDir.Magnitude <= 0.05 then
-			faceTarget(targetPos)
-			return true
-		end
+	-- 	if flatDir.Magnitude <= 0.05 then
+	-- 		faceTarget(targetPos)
+	-- 		return true
+	-- 	end
 
-		flatDir = flatDir.Unit
+	-- 	flatDir = flatDir.Unit
 
-		local desiredXZ = Vector3.new(
-			targetPos.X - flatDir.X * desiredDistance,
-			0,
-			targetPos.Z - flatDir.Z * desiredDistance
-		)
+	-- 	local desiredXZ = Vector3.new(
+	-- 		targetPos.X - flatDir.X * desiredDistance,
+	-- 		0,
+	-- 		targetPos.Z - flatDir.Z * desiredDistance
+	-- 	)
 
-		local groundY = getGroundYNear(
-			Vector3.new(desiredXZ.X, targetPos.Y + 5, desiredXZ.Z),
-			{character, targetPart.Parent}
-		)
+	-- 	local groundY = getGroundYNear(
+	-- 		Vector3.new(desiredXZ.X, targetPos.Y + 5, desiredXZ.Z),
+	-- 		{character, targetPart.Parent}
+	-- 	)
 
-		local finalY = groundY and (groundY + 1.25) or math.max(myPos.Y, targetPos.Y)
-		local desiredPos = Vector3.new(desiredXZ.X, finalY, desiredXZ.Z)
+	-- 	local finalY = groundY and (groundY + 1.25) or math.max(myPos.Y, targetPos.Y)
+	-- 	local desiredPos = Vector3.new(desiredXZ.X, finalY, desiredXZ.Z)
 
-		startNoclip()
-		hrp.CFrame = CFrame.lookAt(
-			desiredPos,
-			Vector3.new(targetPos.X, desiredPos.Y, targetPos.Z)
-		)
-		stopNoclip()
-		return true
-	end
+	-- 	startNoclip()
+	-- 	hrp.CFrame = CFrame.lookAt(
+	-- 		desiredPos,
+	-- 		Vector3.new(targetPos.X, desiredPos.Y, targetPos.Z)
+	-- 	)
+	-- 	stopNoclip()
+	-- 	return true
+	-- end
 
 	-------------------------------------------------
 	-- Staging
@@ -749,6 +794,9 @@ function AutoMonster.run(State)
 		local repathFailures = 0
 		local maxRepathFailures = 3
 
+		local REPOSITION_TRIGGER = ATTACK_RANGE + 2     -- เกินนี้ค่อยขยับใหม่
+		local HARD_REPATH_TRIGGER = 16                  -- ไกลมาก = วิ่งเข้าใหม่ชัดเจน
+
 		while getgenv().RobloxUIRunning and State.autoMonsterFarm and monster and monster.Parent and tick() < timeout do
 			if isPausedForAutoMonster() or isBossPriorityActive() then
 				cancelTween()
@@ -769,7 +817,8 @@ function AutoMonster.run(State)
 			local _, _, hrp = getCharacterParts()
 			local dist = (part.Position - hrp.Position).Magnitude
 
-			if dist > ATTACK_RANGE then
+			-- ยังไกลอยู่ ค่อยเข้าหา
+			if dist > REPOSITION_TRIGGER then
 				local moved = moveToTargetPart(part, STOP_DISTANCE)
 				if not moved then
 					repathFailures += 1
@@ -783,18 +832,13 @@ function AutoMonster.run(State)
 				end
 
 				repathFailures = 0
-
-				part = findMonsterRoot(monster)
-				if not part then
-					cancelTween()
-					return true
-				end
+				task.wait(0.05)
+			else
+				-- อยู่ในระยะตีแล้ว: หันหน้า + ตี อย่างเดียว
+				faceTarget(part.Position)
+				attack()
+				task.wait(0.12)
 			end
-
-			stickToTargetPart(part, 2.5)
-			faceTarget(part.Position)
-			attack()
-			task.wait(0.12)
 
 			if not isMonsterAlive(monster) then
 				cancelTween()
@@ -809,7 +853,9 @@ function AutoMonster.run(State)
 			end
 
 			local dist2 = (part2.Position - hrp2.Position).Magnitude
-			if dist2 > 20 then
+
+			-- ถ้ามอนหนีห่างจริง ค่อยนับ repath
+			if dist2 > HARD_REPATH_TRIGGER then
 				repathFailures += 1
 				if repathFailures >= maxRepathFailures then
 					warn("[AutoMonster] Target keeps drifting away:", monster.Name)
