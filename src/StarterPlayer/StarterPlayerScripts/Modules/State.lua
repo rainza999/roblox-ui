@@ -23,7 +23,7 @@ local State = {
 
 	selectedLocations = {
 		["2s"] = true,
-		["I4_HolyCave_03_1"] = false,
+		["I4_HolyCave_03_1"] = true,
 		["I4_HolyCave_03_2"] = true,
 		["Island3CavePeakBarrier"] = false,
 		["Island3CavePeakEnd"] = false,
