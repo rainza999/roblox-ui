@@ -594,11 +594,11 @@ function AutoMiner.run(State)
 		for _, oreModel in ipairs(oreModels) do
 			local oreName = oreModel:GetAttribute("Ore")
 			if oreName then
-				print("[AutoMiner] Mineral has ore:", mineral.Name, "->", oreName)
+				-- print("[AutoMiner] Mineral has ore:", mineral.Name, "->", oreName)
 			end
 
 			if oreName and State.selectedOres and State.selectedOres[oreName] then
-				print("[AutoMiner] Ore matched before move:", oreName)
+				-- print("[AutoMiner] Ore matched before move:", oreName)
 				return false
 			end
 		end
@@ -704,7 +704,7 @@ function AutoMiner.run(State)
         local dist = (standPos - hrp.Position).Magnitude
         local tweenTime = math.max(dist / 85, 0.15)
 
-        print("[AutoMiner] tween dist =", dist, " time =", tweenTime, " target =", targetPart.Name)
+        -- print("[AutoMiner] tween dist =", dist, " time =", tweenTime, " target =", targetPart.Name)
 
         local tween = TweenService:Create(
             hrp,
