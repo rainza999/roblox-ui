@@ -3,10 +3,8 @@ local AutoAttackBoss = {}
 function AutoAttackBoss.run(State)
 	print("AutoAttackBoss started")
 
-	State = State or {}
+	assert(State, "AutoAttackBoss.run(State) missing State")
 
-	print("State =", State)
-	
 	State.bossInProgress = State.bossInProgress or false
 	State.bossPriorityActive = State.bossPriorityActive or false
 	State.bossNextRunAt = State.bossNextRunAt or 0

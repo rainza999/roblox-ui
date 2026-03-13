@@ -119,8 +119,6 @@ local State = {
 	activeController = nil,
 	activeReason = nil,
 
-	autoNpcBusy = false,
-	
 	-- boss scheduler
 	bossInProgress = false,
 	bossPriorityActive = false,

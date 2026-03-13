@@ -38,16 +38,26 @@ local AutoMonster = loadModule("AutoMonster")
 local PotionManager = loadModule("PotionManager")
 local AutoNPC = loadModule("AutoNPC")
 
-PressT.start(State)
-PotionManager.run(State)
-AutoNPC.run(State)
+-- start systems once
+task.spawn(function()
+	PressT.run(State)
+end)
+
+task.spawn(function()
+	PotionManager.run(State)
+end)
+
+task.spawn(function()
+	AutoNPC.run(State)
+end)
+
+task.spawn(function()
+	AutoAttackBoss.run(State)
+end)
 
 task.spawn(function()
 	AutoMiner.run(State)
 end)
-
-print("AutoMonster modul234e =", AutoMonster)
-print("AutoMonster.run =", AutoMonster and AutoMonster.run)
 
 task.spawn(function()
 	print("calling AutoMonster.run...")
@@ -55,22 +65,6 @@ task.spawn(function()
 	print("AutoMonster.run returned")
 end)
 
--- task.spawn(function()
--- 	AutoMonster.run(State)
--- end)
+UI.create(State)
 
-UI.create(State, PotionManager, AutoMiner, AutoMonster)
-
-task.spawn(function()
-	while getgenv().RobloxUIRunning do
-		if State.autoBoss then
-			AutoAttackBoss.run(State)
-		end
-
-		if State.autoPressT then
-			PressT.run(State)
-		end
-
-		task.wait(0.2)
-	end
-end)
+print("All modules started")
