@@ -1,9 +1,12 @@
 local AutoAttackBoss = {}
-State.bossInProgress = State.bossInProgress or false
-State.bossPriorityActive = State.bossPriorityActive or false
-State.bossNextRunAt = State.bossNextRunAt or 0
+
 function AutoAttackBoss.run(State)
 	print("AutoAttackBoss started")
+
+	State.bossInProgress = State.bossInProgress or false
+	State.bossPriorityActive = State.bossPriorityActive or false
+	State.bossNextRunAt = State.bossNextRunAt or 0
+	State.autoNpcBusy = State.autoNpcBusy or false
 
 	local TweenService = game:GetService("TweenService")
 	local Players = game:GetService("Players")
