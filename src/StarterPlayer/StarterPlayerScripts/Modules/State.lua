@@ -22,7 +22,7 @@ local State = {
 	clearStatusText = "",
 
 	selectedLocations = {
-		["2s"] = true,
+		["2s"] = false,
 		["I4_HolyCave_03_1"] = false,
 		["I4_HolyCave_03_2"] = true,
 		["Island3CavePeakBarrier"] = false,
