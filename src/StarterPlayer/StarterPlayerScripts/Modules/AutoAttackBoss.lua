@@ -14,7 +14,7 @@ function AutoAttackBoss.run(State)
 	local TweenService = game:GetService("TweenService")
 	local Players = game:GetService("Players")
 	local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
+	local VirtualInputManager = game:GetService("VirtualInputManager")
 	local player = Players.LocalPlayer
 
 	local function getCharacter()
@@ -109,6 +109,19 @@ function AutoAttackBoss.run(State)
 		return nil
 	end
 
+	local function pressKey(keyCode)
+        if not VirtualInputManager or not VirtualInputManager.SendKeyEvent then
+            warn("[AutoMiner] VirtualInputManager.SendKeyEvent unavailable")
+            return false
+        end
+
+        VirtualInputManager:SendKeyEvent(true, keyCode, false, game)
+        task.wait(0.05)
+        VirtualInputManager:SendKeyEvent(false, keyCode, false, game)
+        task.wait(0.1)
+        return true
+    end
+
 	local function hasEquippedWeapon()
 		local character = getCharacter()
 
@@ -175,7 +188,7 @@ function AutoAttackBoss.run(State)
 		warn("[AutoAttackBoss] Weapon not found after ToolActivated and key 2")
 		return false
 	end
-	
+
 	local function attack()
 		local ok, err = pcall(function()
 			ReplicatedStorage

@@ -8,6 +8,7 @@ function AutoMonster.run(State)
 	local Players = game:GetService("Players")
 	local ReplicatedStorage = game:GetService("ReplicatedStorage")
 	local RunService = game:GetService("RunService")
+	local VirtualInputManager = game:GetService("VirtualInputManager")
 
 	local player = Players.LocalPlayer
 
@@ -28,6 +29,7 @@ function AutoMonster.run(State)
 	local STAGING_POINT = Vector3.new(389, 138, 93)
 	local STAGING_RADIUS = 8
 
+	
 	local STAGING_CONFIG = {
 		["common orc"] = {
 			enabled = true,
@@ -90,6 +92,19 @@ function AutoMonster.run(State)
 
 	-------------------------------------------------
 
+	local function pressKey(keyCode)
+        if not VirtualInputManager or not VirtualInputManager.SendKeyEvent then
+            warn("[AutoMiner] VirtualInputManager.SendKeyEvent unavailable")
+            return false
+        end
+
+        VirtualInputManager:SendKeyEvent(true, keyCode, false, game)
+        task.wait(0.05)
+        VirtualInputManager:SendKeyEvent(false, keyCode, false, game)
+        task.wait(0.1)
+        return true
+    end
+	
 	local function hasEquippedWeapon()
 		local character = getCharacter()
 
@@ -131,12 +146,12 @@ function AutoMonster.run(State)
 		end)
 
 		if not ok then
-			warn("[AutoAttackBoss] Equip via ToolActivated failed:", err)
+			warn("[AutoMonster] Equip via ToolActivated failed:", err)
 		end
 
 		local equipped = waitForEquippedObject(hasEquippedWeapon, 2)
 		if equipped then
-			print("[AutoAttackBoss] Weapon equipped via ToolActivated:", equipped.Name)
+			print("[AutoMonster] Weapon equipped via ToolActivated:", equipped.Name)
 			return true
 		end
 

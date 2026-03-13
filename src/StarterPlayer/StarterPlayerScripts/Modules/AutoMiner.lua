@@ -10,7 +10,7 @@ function AutoMiner.run(State)
 
 	local player = Players.LocalPlayer
 
-    	local VirtualInputManager = game:GetService("VirtualInputManager")
+    local VirtualInputManager = game:GetService("VirtualInputManager")
 
 	local currentMode = nil
 
