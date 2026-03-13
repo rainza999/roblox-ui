@@ -691,7 +691,7 @@ function PotionManager.run(State)
 
 		-- if st.refillMode then
 		-- 	print(
-		-- 		"[PotionRefill]",
+		-- 		"[PotionRefill1]",
 		-- 		toolName,
 		-- 		"remain=", math.floor(remain),
 		-- 		"stacks=", stacks,
