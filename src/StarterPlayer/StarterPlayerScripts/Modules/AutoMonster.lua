@@ -413,7 +413,7 @@ function AutoMonster.run(State)
 		activeTween = nil
 		stopNoclip()
 
-		return (hrp.Position - pos).Magnitude <= 8
+		return (hrp.Position - pos).Magnitude <= 2.5
 	end
 
 	local function flyTo(targetPos)
@@ -490,20 +490,8 @@ function AutoMonster.run(State)
 			targetPos.Z - flatDir.Z * desiredDistance
 		)
 
-		-- เอา Y ของตัวเราเป็นหลัก เพื่อลดอาการเด้งขึ้นหัวมอน
-		local desiredY = myPos.Y
-
-		-- ถ้ามีพื้นค่อยอิงพื้นแบบเบา ๆ
-		local groundY = getGroundYNear(
-			Vector3.new(desiredXZ.X, math.max(targetPos.Y, myPos.Y) + 8, desiredXZ.Z),
-			{player.Character, targetPart.Parent}
-		)
-
-		if groundY then
-			desiredY = groundY + 2.5
-		end
-
-		return Vector3.new(desiredXZ.X, desiredY, desiredXZ.Z)
+		-- ใช้ Y ปัจจุบันของเราไปเลย ไม่ต้อง raycast หาพื้น
+		return Vector3.new(desiredXZ.X, myPos.Y, desiredXZ.Z)
 	end
 	-- local function getSafeStandPositionNearTarget(targetPart, stopDistance)
 	-- 	local character, _, hrp = getCharacterParts()
