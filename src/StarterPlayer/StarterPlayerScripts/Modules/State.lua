@@ -70,10 +70,10 @@ local State = {
 	},
 
 	selectedMonsters = {
-		["Hellflame Oni"] = false,
-		["Warlord Oni"] = false,
-		["Frostburn Oni"] = false,
-		["Brute Oni"] = false,
+		["Hellflame Oni"] = true,
+		["Warlord Oni"] = true,
+		["Frostburn Oni"] = true,
+		["Brute Oni"] = true,
 
 		["Monk Panda"] = false,
 		["Samurai Ape"] = false,
