@@ -35,6 +35,24 @@ function AutoAttackBoss.run(State)
 		State.bossPriorityActive = false
 	end
 
+	local function waitAfterBossFinish(seconds)
+		seconds = seconds or 7
+
+		local untilTime = tick() + seconds
+		State.bossInProgress = false
+		State.bossPriorityActive = true
+		State.autoNpcBusy = true
+
+		print(string.format("Waiting %.1fs after boss finish before releasing control...", seconds))
+
+		while getgenv().RobloxUIRunning and tick() < untilTime do
+			if not State.autoBoss then
+				break
+			end
+			task.wait(0.2)
+		end
+	end
+
 	-------------------------------------------------
 	-- Noclip
 	-------------------------------------------------
@@ -227,6 +245,8 @@ function AutoAttackBoss.run(State)
 		local finishTime = os.time()
 		print("จบรอบบอส:", os.date("%H:%M:%S", finishTime))
 
+		-- รอให้ตัวละครกลับแมพ/โหลดฉากก่อน
+		waitAfterBossFinish(7) -- ปรับเป็น 5, 7, 10 ได้
 		-- สำคัญ: ปล่อย flag ทันทีหลังจบรอบ เพื่อให้ AutoMiner กลับไปทำงาน
 		clearBossFlags()
 
