@@ -31,7 +31,7 @@ local State = {
 	},
 
 	selectedMinerals = {
-		["Blossom Boulder"] = false,
+		["Blossom Boulder"] = true,
 		["Glowy Rock"] = false,
 		["Floating Crystal"] = false,
 		["Heart Of The Island"] = false,
