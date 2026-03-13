@@ -689,16 +689,16 @@ function PotionManager.run(State)
 		local bag = findToolCount(toolName)
 		local missing = getMissingStacks(toolName)
 
-		if st.refillMode then
-			print(
-				"[PotionRefill]",
-				toolName,
-				"remain=", math.floor(remain),
-				"stacks=", stacks,
-				"bag=", bag,
-				"missing=", missing
-			)
-		end
+		-- if st.refillMode then
+		-- 	print(
+		-- 		"[PotionRefill]",
+		-- 		toolName,
+		-- 		"remain=", math.floor(remain),
+		-- 		"stacks=", stacks,
+		-- 		"bag=", bag,
+		-- 		"missing=", missing
+		-- 	)
+		-- end
 
 		-- 1) ถ้ากำลัง refill และมียาอยู่ ให้กดใช้ก่อน
 		if autoUseFlag and needUse(toolName) then
