@@ -694,23 +694,27 @@ function AutoMiner.run(State)
 
         local _, _, hrp = getCharacterParts()
 
+        local standPos = getSafeStandPositionNearTarget(targetPart, stopDistance or 4)
+        if not standPos then
+            return false
+        end
+
         noclip(true)
 
-        local targetPos = targetPart.Position
-        local dist = (targetPos - hrp.Position).Magnitude
+        local dist = (standPos - hrp.Position).Magnitude
+        local tweenTime = math.max(dist / 20, 0.15)
 
         print("[AutoMiner] tween dist =", dist, " time =", tweenTime, " target =", targetPart.Name)
-        
+
         local tween = TweenService:Create(
             hrp,
-            TweenInfo.new(math.max(dist / 85, 0.05), Enum.EasingStyle.Linear),
-            { CFrame = CFrame.new(targetPos) }
+            TweenInfo.new(tweenTime, Enum.EasingStyle.Linear),
+            { CFrame = CFrame.new(standPos) }
         )
 
         tween:Play()
 
         while tween.PlaybackState == Enum.PlaybackState.Playing do
-
             if isPausedForAutoMiner() then
                 tween:Cancel()
                 noclip(false)
@@ -1126,10 +1130,10 @@ function AutoMiner.run(State)
         local _, _, hrp = getCharacterParts()
         local yDiff = math.abs(targetPart.Position.Y - hrp.Position.Y)
 
-        if yDiff > 40 then
-            warn("[AutoMiner] Skip mineral due to huge Y difference:", mineral.Name, yDiff)
-            return false
-        end
+        -- if yDiff > 40 then
+        --     warn("[AutoMiner] Skip mineral due to huge Y difference:", mineral.Name, yDiff)
+        --     return false
+        -- end
 
         local moved = moveToTargetPart(targetPart, 4)
         if moved then
@@ -1167,13 +1171,18 @@ function AutoMiner.run(State)
 
 			-- ถ้าไกลมากค่อย tween เข้าไปก่อน
 			if dist > 6 then
-				moveToMiner(mineral)
-				targetPart = getMinerPart(mineral)
-				if not targetPart then
-					noclip(false)
-					return true
-				end
-			end
+                local moved = moveToMiner(mineral)
+                if not moved then
+                    noclip(false)
+                    return false
+                end
+
+                targetPart = getMinerPart(mineral)
+                if not targetPart then
+                    noclip(false)
+                    return true
+                end
+            end
 
 			-- ระหว่างทุบให้เกาะแร่ตลอด
 			-- stickToTargetPart(targetPart, 2.2)
@@ -1198,6 +1207,12 @@ function AutoMiner.run(State)
 			end
 
             -- stickToTargetPart(targetPart, 2.2)
+            local realDist = (targetPart.Position - hrp.Position).Magnitude
+            if realDist > 8 then
+                task.wait(0.1)
+                continue
+            end
+
 			faceTargetPart(targetPart)
 			mining()
 			task.wait(0.12)
@@ -1296,6 +1311,11 @@ function AutoMiner.run(State)
 				return false
 			end
 
+            local realDist = (targetPart.Position - hrp.Position).Magnitude
+            if realDist > 8 then
+                task.wait(0.1)
+                continue
+            end
 			faceTargetPart(targetPart)
 			mining()
 			task.wait(0.15)
@@ -1346,13 +1366,23 @@ function AutoMiner.run(State)
 			setPreviewMineral(mineral)
 
 			print("[AutoMiner] Start mining:", mineral.Name)
-			moveToMiner(mineral)
 
-			clearPreviewMineral()
-			setActiveMineral(mineral)
+            local moved = moveToMiner(mineral)
+            if not moved then
+                print("[AutoMiner] Failed to move to mineral:", mineral.Name)
+                markMineralSkipped(mineral, 5)
+                ControllerLock.release(State, "AutoMiner")
+                clearPreviewMineral()
+                clearActiveMineral()
+                task.wait(0.2)
+                continue
+            end
+
+            clearPreviewMineral()
+            setActiveMineral(mineral)
 
             lastOreSummaryText = ""
-			local finished = mineTarget(mineral)
+            local finished = mineTarget(mineral)
 
             ControllerLock.release(State, "AutoMiner")
 
