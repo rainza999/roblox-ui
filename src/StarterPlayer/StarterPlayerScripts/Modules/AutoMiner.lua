@@ -1195,7 +1195,7 @@ function AutoMiner.run(State)
 				if oreSpawned then
 					foundOreOnce = true
 
-					printOreSummaryIfChanged(mineral)
+					printOreSummary(mineral)
 
 					local matched = hasMatchingSelectedOre(mineral)
 					if not matched then
@@ -1247,7 +1247,7 @@ function AutoMiner.run(State)
 			end
 
 			if oreMode and foundOreOnce then
-				printOreSummaryIfChanged(mineral)
+				printOreSummary(mineral)
 
 				local matched = hasMatchingSelectedOre(mineral)
 				if not matched then
