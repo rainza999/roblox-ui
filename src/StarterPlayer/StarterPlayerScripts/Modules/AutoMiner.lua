@@ -688,32 +688,27 @@ function AutoMiner.run(State)
             return false
         end
 
-        local character, _, hrp = getCharacterParts()
-
         if not targetPart or not targetPart.Parent then
             return false
         end
 
-        local desiredPos = getSafeStandPositionNearTarget(targetPart, stopDistance or 4)
-        if not desiredPos then
-            return false
-        end
+        local _, _, hrp = getCharacterParts()
 
         noclip(true)
 
-        local lookAtPos = Vector3.new(targetPart.Position.X, desiredPos.Y, targetPart.Position.Z)
-        local desiredCF = CFrame.lookAt(desiredPos, lookAtPos)
+        local targetPos = targetPart.Position
+        local dist = (targetPos - hrp.Position).Magnitude
 
-        local dist = (desiredPos - hrp.Position).Magnitude
         local tween = TweenService:Create(
             hrp,
-            TweenInfo.new(math.max(dist / 60, 0.05), Enum.EasingStyle.Linear),
-            { CFrame = desiredCF }
+            TweenInfo.new(math.max(dist / 85, 0.05), Enum.EasingStyle.Linear),
+            { CFrame = CFrame.new(targetPos) }
         )
 
         tween:Play()
 
         while tween.PlaybackState == Enum.PlaybackState.Playing do
+
             if isPausedForAutoMiner() then
                 tween:Cancel()
                 noclip(false)
@@ -726,11 +721,11 @@ function AutoMiner.run(State)
                 return false
             end
 
-            task.wait(0.05)
+            task.wait()
         end
 
         noclip(false)
-        return not isPausedForAutoMiner()
+        return true
     end
 
     local function faceTargetPart(targetPart)
