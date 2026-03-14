@@ -525,15 +525,15 @@ function AutoMonster.run(State)
 		local flyPos = Vector3.new(targetPos.X, midY, targetPos.Z)
 		local dropPos = targetPos
 
-		if not tweenTo(risePos, 95) then
+		if not tweenTo(risePos, 60) then
 			return false
 		end
 
-		if not tweenTo(flyPos, 100) then
+		if not tweenTo(flyPos, 60) then
 			return false
 		end
 
-		if not tweenTo(dropPos, 75) then
+		if not tweenTo(dropPos, 60) then
 			return false
 		end
 
@@ -659,13 +659,13 @@ function AutoMonster.run(State)
 
 		-- ถ้าระดับสูงต่างกันมาก หรืออยู่คนละชั้น ไปหามอนตรง ๆ ก่อน
 		if yDiff > 6 then
-			moved = tweenTo(targetPart.Position, 85)
+			moved = tweenTo(targetPart.Position, 60)
 		else
 			local standPos = getApproachPosition(targetPart, stopDistance or STOP_DISTANCE)
 			if not standPos then
 				return false
 			end
-			moved = tweenTo(standPos, 85)
+			moved = tweenTo(standPos, 60)
 		end
 
 		if not moved then

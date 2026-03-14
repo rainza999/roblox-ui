@@ -71,6 +71,17 @@ function PotionManager.run(State)
 		return tick()
 	end
 
+    local function setCollision(state)
+        local character = getCharacter()
+        if not character then return end
+
+        for _, v in ipairs(character:GetDescendants()) do
+            if v:IsA("BasePart") then
+                v.CanCollide = state
+            end
+        end
+    end
+
 	local function getCharacter()
 		return player.Character or player.CharacterAdded:Wait()
 	end
@@ -123,72 +134,78 @@ function PotionManager.run(State)
 	end
 
 	local function tweenToPosition(targetPos, speed)
-		local hrp = getHRP()
-		if not hrp then
-			return false
-		end
+        local hrp = getHRP()
+        if not hrp then
+            return false
+        end
 
-		speed = speed or 60
-		local distance = (hrp.Position - targetPos).Magnitude
-		local duration = math.max(distance / speed, 0.15)
+        speed = speed or 60
+        local distance = (hrp.Position - targetPos).Magnitude
+        local duration = math.max(distance / speed, 0.15)
 
-		local tween = TweenService:Create(
-			hrp,
-			TweenInfo.new(duration, Enum.EasingStyle.Linear),
-			{ CFrame = CFrame.new(targetPos) }
-		)
+        setCollision(false)
 
-		local finished = false
-		local conn
+        local tween = TweenService:Create(
+            hrp,
+            TweenInfo.new(duration, Enum.EasingStyle.Linear),
+            { CFrame = CFrame.new(targetPos) }
+        )
 
-		conn = tween.Completed:Connect(function()
-			finished = true
-			if conn then
-				conn:Disconnect()
-				conn = nil
-			end
-		end)
+        local finished = false
+        local conn
 
-		tween:Play()
+        conn = tween.Completed:Connect(function()
+            finished = true
+            if conn then
+                conn:Disconnect()
+                conn = nil
+            end
+        end)
 
-		local timeoutAt = now() + duration + 2
-		while now() < timeoutAt do
-			hrp = getHRP()
-			if not hrp or not hrp.Parent then
-				if conn then
-					conn:Disconnect()
-				end
-				tween:Cancel()
-				return false
-			end
+        tween:Play()
 
-			local dist = (hrp.Position - targetPos).Magnitude
-			if dist <= 2 then
-				if conn then
-					conn:Disconnect()
-				end
-				tween:Cancel()
-				return true
-			end
+        local timeoutAt = now() + duration + 2
+        while now() < timeoutAt do
+            hrp = getHRP()
+            if not hrp or not hrp.Parent then
+                if conn then
+                    conn:Disconnect()
+                end
+                tween:Cancel()
+                setCollision(true)
+                return false
+            end
 
-			if finished then
-				break
-			end
+            local dist = (hrp.Position - targetPos).Magnitude
+            if dist <= 3 then
+                if conn then
+                    conn:Disconnect()
+                end
+                tween:Cancel()
+                setCollision(true)
+                return true
+            end
 
-			task.wait(0.05)
-		end
+            if finished then
+                break
+            end
 
-		if conn then
-			conn:Disconnect()
-		end
+            task.wait(0.05)
+        end
 
-		hrp = getHRP()
-		if not hrp then
-			return false
-		end
+        if conn then
+            conn:Disconnect()
+        end
 
-		return (hrp.Position - targetPos).Magnitude <= 6
-	end
+        setCollision(true)
+
+        hrp = getHRP()
+        if not hrp then
+            return false
+        end
+
+        return (hrp.Position - targetPos).Magnitude <= 5
+    end
 
 	local function getPotionBuyPosition(toolName)
 		local proximity = workspace:FindFirstChild("Proximity")
@@ -238,7 +255,7 @@ function PotionManager.run(State)
             return false
         end
 
-        local movePos = targetPos
+        local movePos = Vector3.new(targetPos.X, targetPos.Y + 3, targetPos.Z)
 
         print(
             "[PotionShop] exact target for",
