@@ -1,9 +1,11 @@
+local ControllerLock = getgenv().RobloxModules.ControllerLock
 local PotionManager = {}
 
 function PotionManager.run(State)
 	local ReplicatedStorage = game:GetService("ReplicatedStorage")
 	local Players = game:GetService("Players")
 	local TweenService = game:GetService("TweenService")
+	local RunService = game:GetService("RunService")
 
 	local player = Players.LocalPlayer
 
@@ -28,6 +30,14 @@ function PotionManager.run(State)
 	State.pauseReason = State.pauseReason or nil
 	State.pauseOwner = State.pauseOwner or nil
 	State.isPotionBusy = State.isPotionBusy or false
+
+	local OWNER = "PotionManager"
+	local MOVE_SPEED = 55
+	local ARRIVE_DISTANCE = 6
+	local BUY_DISTANCE = 12
+	local STUCK_CHECK_INTERVAL = 0.35
+	local STUCK_MIN_PROGRESS = 1.5
+	local STUCK_RETRY_LIMIT = 2
 
 	local POTIONS = {
 		LuckPotion1 = {
@@ -75,16 +85,10 @@ function PotionManager.run(State)
 		return player.Character or player.CharacterAdded:Wait()
 	end
 
-    local function setCollision(state)
-        local character = getCharacter()
-        if not character then return end
-
-        for _, v in ipairs(character:GetDescendants()) do
-            if v:IsA("BasePart") then
-                v.CanCollide = state
-            end
-        end
-    end
+	local function getHumanoid()
+		local character = getCharacter()
+		return character and character:FindFirstChildOfClass("Humanoid")
+	end
 
 	local function getHRP()
 		local character = getCharacter()
@@ -118,6 +122,42 @@ function PotionManager.run(State)
 		return State.pauseOwner ~= nil and State.pauseOwner ~= owner
 	end
 
+	local function acquireMove(reason, allowSteal)
+		if allowSteal then
+			return ControllerLock.trySteal(State, OWNER, reason)
+		end
+		return ControllerLock.tryAcquire(State, OWNER, reason)
+	end
+
+	local function releaseMove()
+		ControllerLock.release(State, OWNER)
+	end
+
+	local function isMoveBlocked()
+		return ControllerLock.isOwnedByOther(State, OWNER)
+	end
+
+	local function setNoClip(enabled)
+		local character = getCharacter()
+		if not character then
+			return
+		end
+
+		for _, v in ipairs(character:GetDescendants()) do
+			if v:IsA("BasePart") then
+				v.CanCollide = not enabled
+			end
+		end
+	end
+
+	local function stopMovement()
+		local hrp = getHRP()
+		if hrp then
+			hrp.AssemblyLinearVelocity = Vector3.zero
+			hrp.AssemblyAngularVelocity = Vector3.zero
+		end
+	end
+
 	local function debugPotionTargets()
 		local proximity = workspace:FindFirstChild("Proximity")
 		if not proximity then
@@ -133,89 +173,6 @@ function PotionManager.run(State)
 		end
 	end
 
-	local function tweenToPosition(targetPos, speed)
-		local hrp = getHRP()
-		local character = getCharacter()
-		if not hrp or not character then
-			return false
-		end
-
-		local humanoid = character:FindFirstChildOfClass("Humanoid")
-		speed = speed or 60
-
-		local distance = (hrp.Position - targetPos).Magnitude
-		local duration = math.max(distance / speed, 0.15)
-
-		setCollision(false)
-
-		if humanoid then
-			humanoid:ChangeState(Enum.HumanoidStateType.Physics)
-		end
-
-		hrp.AssemblyLinearVelocity = Vector3.zero
-		hrp.AssemblyAngularVelocity = Vector3.zero
-
-		local tween = TweenService:Create(
-			hrp,
-			TweenInfo.new(duration, Enum.EasingStyle.Linear),
-			{ CFrame = CFrame.new(targetPos) }
-		)
-
-		local finished = false
-		local conn
-
-		conn = tween.Completed:Connect(function()
-			finished = true
-			if conn then
-				conn:Disconnect()
-				conn = nil
-			end
-		end)
-
-		tween:Play()
-
-		local timeoutAt = now() + duration + 2
-		while now() < timeoutAt do
-			hrp = getHRP()
-			if not hrp or not hrp.Parent then
-				if conn then conn:Disconnect() end
-				tween:Cancel()
-				setCollision(true)
-				return false
-			end
-
-			local dist = (hrp.Position - targetPos).Magnitude
-			if dist <= 6 then
-				if conn then conn:Disconnect() end
-				tween:Cancel()
-				setCollision(true)
-				return true
-			end
-
-			if finished then
-				break
-			end
-
-			task.wait(0.05)
-		end
-
-		if conn then
-			conn:Disconnect()
-		end
-
-		tween:Cancel()
-		task.wait(0.1)
-
-		hrp = getHRP()
-		setCollision(true)
-
-		if not hrp then
-			return false
-		end
-
-		return (hrp.Position - targetPos).Magnitude <= 8
-	end
-
 	local function getPotionBuyPosition(toolName)
 		local proximity = workspace:FindFirstChild("Proximity")
 		if not proximity then
@@ -228,11 +185,12 @@ function PotionManager.run(State)
 			warn("[PotionShop] Proximity target not found:", toolName)
 			return nil
 		end
+
 		print("[PotionShop]", toolName, "class =", target.ClassName, "full =", target:GetFullName())
+
 		local ok, pivot = pcall(function()
 			return target.WorldPivot
 		end)
-
 		if ok and pivot then
 			return pivot.Position
 		end
@@ -240,7 +198,6 @@ function PotionManager.run(State)
 		local ok2, cf = pcall(function()
 			return target:GetPivot()
 		end)
-
 		if ok2 and cf then
 			return cf.Position
 		end
@@ -252,73 +209,6 @@ function PotionManager.run(State)
 
 		warn("[PotionShop] Could not resolve buy position for:", toolName)
 		return nil
-	end
-
-	local function ensureNearPotionShop(toolName)
-		local hrp = getHRP()
-		local targetPos = getPotionBuyPosition(toolName)
-
-		if not hrp or not targetPos then
-			debugPotionTargets()
-			warn("[PotionShop] missing targetPos or hrp for", toolName)
-			return false
-		end
-
-		local currentPos = hrp.Position
-		local flatDir = Vector3.new(targetPos.X - currentPos.X, 0, targetPos.Z - currentPos.Z)
-
-		if flatDir.Magnitude < 0.001 then
-			flatDir = Vector3.new(0, 0, -1)
-		else
-			flatDir = flatDir.Unit
-		end
-
-		-- อย่าไปทับ object ตรงๆ ให้ยืนหน้าเป้าแทน
-		local standOff = 5
-		local movePos = Vector3.new(
-			targetPos.X - flatDir.X * standOff,
-			targetPos.Y + 2,
-			targetPos.Z - flatDir.Z * standOff
-		)
-
-		print(
-			"[PotionShop] exact target for",
-			toolName,
-			"=>",
-			math.floor(targetPos.X),
-			math.floor(targetPos.Y),
-			math.floor(targetPos.Z),
-			"| move to =>",
-			math.floor(movePos.X),
-			math.floor(movePos.Y),
-			math.floor(movePos.Z)
-		)
-
-		local distToMove = (hrp.Position - movePos).Magnitude
-		if distToMove <= 4 then
-			return true
-		end
-
-		local ok = tweenToPosition(movePos, 60)
-		if not ok then
-			warn("[PotionShop] tween failed for", toolName)
-
-			-- fallback: วาร์ปสั้นๆ ไปใกล้อีกนิด
-			local hrp2 = getHRP()
-			if hrp2 then
-				hrp2.CFrame = CFrame.new(movePos)
-				task.wait(0.15)
-
-				if (hrp2.Position - movePos).Magnitude <= 8 then
-					return true
-				end
-			end
-
-			return false
-		end
-
-		task.wait(0.15)
-		return true
 	end
 
 	local function findToolInstance(toolName)
@@ -499,11 +389,7 @@ function PotionManager.run(State)
 		local remain = getRemainingSeconds(toolName)
 		local missing = getMissingStacks(toolName)
 
-		if remain <= cfg.rebuffWhenRemainAtOrBelow and missing > 0 then
-			return true
-		end
-
-		return false
+		return remain <= cfg.rebuffWhenRemainAtOrBelow and missing > 0
 	end
 
 	local function updateRefillMode(toolName)
@@ -572,16 +458,179 @@ function PotionManager.run(State)
 		end
 
 		updateRefillMode(toolName)
+		return st.refillMode
+	end
 
-		if st.refillMode then
+	local function tweenToPosition(targetPos, speed, timeoutExtra)
+		if not acquireMove("move_to_potion_shop", true) then
+			return false
+		end
+
+		local success = false
+		local tween = nil
+		local conn = nil
+
+		local ok, err = pcall(function()
+			local hrp = getHRP()
+			local humanoid = getHumanoid()
+			if not hrp or not humanoid then
+				return
+			end
+
+			speed = math.clamp(speed or MOVE_SPEED, 50, 60)
+			local distance = (hrp.Position - targetPos).Magnitude
+			local duration = math.max(distance / speed, 0.2)
+
+			stopMovement()
+			setNoClip(true)
+
+			tween = TweenService:Create(
+				hrp,
+				TweenInfo.new(duration, Enum.EasingStyle.Linear),
+				{ CFrame = CFrame.new(targetPos) }
+			)
+
+			local finished = false
+			conn = tween.Completed:Connect(function()
+				finished = true
+				if conn then
+					conn:Disconnect()
+					conn = nil
+				end
+			end)
+
+			tween:Play()
+
+			local timeoutAt = now() + duration + (timeoutExtra or 2)
+			local lastCheckAt = now()
+			local lastPos = hrp.Position
+			local stuckCount = 0
+
+			while now() < timeoutAt do
+				hrp = getHRP()
+				humanoid = getHumanoid()
+
+				if not hrp or not humanoid or humanoid.Health <= 0 then
+					if conn then conn:Disconnect() end
+					if tween then tween:Cancel() end
+					return
+				end
+
+				if ControllerLock.isOwnedByOther(State, OWNER) then
+					if conn then conn:Disconnect() end
+					if tween then tween:Cancel() end
+					return
+				end
+
+				local dist = (hrp.Position - targetPos).Magnitude
+				if dist <= ARRIVE_DISTANCE then
+					if conn then conn:Disconnect() end
+					if tween then tween:Cancel() end
+					success = true
+					return
+				end
+
+				if now() - lastCheckAt >= STUCK_CHECK_INTERVAL then
+					local progressed = (hrp.Position - lastPos).Magnitude
+					if progressed < STUCK_MIN_PROGRESS then
+						stuckCount = stuckCount + 1
+					else
+						stuckCount = 0
+					end
+
+					lastCheckAt = now()
+					lastPos = hrp.Position
+
+					if stuckCount >= STUCK_RETRY_LIMIT then
+						if conn then conn:Disconnect() end
+						if tween then tween:Cancel() end
+						return
+					end
+				end
+
+				if finished then
+					break
+				end
+
+				RunService.Heartbeat:Wait()
+			end
+
+			if conn then
+				conn:Disconnect()
+				conn = nil
+			end
+
+			if tween then
+				tween:Cancel()
+				tween = nil
+			end
+
+			hrp = getHRP()
+			if hrp then
+				success = (hrp.Position - targetPos).Magnitude <= BUY_DISTANCE
+			end
+		end)
+
+		stopMovement()
+		setNoClip(false)
+		releaseMove()
+
+		if not ok then
+			warn("[PotionManager] tweenToPosition error:", err)
+			return false
+		end
+
+		return success
+	end
+
+	local function ensureNearPotionShop(toolName)
+		local hrp = getHRP()
+		local targetPos = getPotionBuyPosition(toolName)
+
+		if not hrp or not targetPos then
+			debugPotionTargets()
+			warn("[PotionShop] missing targetPos or hrp for", toolName)
+			return false
+		end
+
+		local currentPos = hrp.Position
+		local flatDir = Vector3.new(targetPos.X - currentPos.X, 0, targetPos.Z - currentPos.Z)
+
+		if flatDir.Magnitude < 0.001 then
+			flatDir = Vector3.new(0, 0, -1)
+		else
+			flatDir = flatDir.Unit
+		end
+
+		local standOff = 7
+		local movePos = Vector3.new(
+			targetPos.X - flatDir.X * standOff,
+			targetPos.Y + 2,
+			targetPos.Z - flatDir.Z * standOff
+		)
+
+		print(
+			"[PotionShop] exact target for",
+			toolName,
+			"=>",
+			math.floor(targetPos.X),
+			math.floor(targetPos.Y),
+			math.floor(targetPos.Z),
+			"| move to =>",
+			math.floor(movePos.X),
+			math.floor(movePos.Y),
+			math.floor(movePos.Z)
+		)
+
+		if (hrp.Position - movePos).Magnitude <= BUY_DISTANCE then
 			return true
 		end
 
-		return false
+		return tweenToPosition(movePos, MOVE_SPEED, 2)
 	end
 
 	local function doBuy(toolName, amount)
-		local owner = "PotionManager"
+		local owner = OWNER
 
 		if not acquirePause(owner, "buy_potion") then
 			return false
@@ -598,6 +647,7 @@ function PotionManager.run(State)
 				return
 			end
 
+			task.wait(0.15)
 			success = buyPotion(toolName, amount)
 		end)
 
@@ -612,7 +662,7 @@ function PotionManager.run(State)
 	end
 
 	local function doUse(toolName)
-		local owner = "PotionManager"
+		local owner = OWNER
 
 		if not acquirePause(owner, "use_potion") then
 			return false
@@ -672,36 +722,16 @@ function PotionManager.run(State)
 
 	local function processPotion(toolName, autoBuyFlag, autoUseFlag)
 		local cfg = POTIONS[toolName]
-		local st = potionState[toolName]
-
 		if not cfg then
 			return false
 		end
 
 		updateRefillMode(toolName)
 
-		local remain = getRemainingSeconds(toolName)
-		local stacks = getRemainingStacks(toolName)
-		local bag = findToolCount(toolName)
-		local missing = getMissingStacks(toolName)
-
-		-- if st.refillMode then
-		-- 	print(
-		-- 		"[PotionRefill1]",
-		-- 		toolName,
-		-- 		"remain=", math.floor(remain),
-		-- 		"stacks=", stacks,
-		-- 		"bag=", bag,
-		-- 		"missing=", missing
-		-- 	)
-		-- end
-
-		-- 1) ถ้ากำลัง refill และมียาอยู่ ให้กดใช้ก่อน
 		if autoUseFlag and needUse(toolName) then
 			return doUse(toolName)
 		end
 
-		-- 2) ถ้าต้องซื้อค่อยซื้อ
 		if autoBuyFlag then
 			local shouldBuy, amount = needBuy(toolName)
 			if shouldBuy then
@@ -713,11 +743,17 @@ function PotionManager.run(State)
 	end
 
 	local function runPotionStep()
-		if isPausedByOther("PotionManager") then
+		if isPausedByOther(OWNER) then
 			return
 		end
 
-		-- Luck มาก่อน เพราะเป็นตัวที่ต้อง maintain stock ต่อเนื่อง
+		if isMoveBlocked() then
+			local currentOwner = ControllerLock.getOwner(State)
+			if currentOwner and currentOwner ~= OWNER then
+				-- จะยังไม่ทำอะไร จนกว่าจะถึงจังหวะขอ steal ตอน tween จริง
+			end
+		end
+
 		if processPotion("LuckPotion1", State.autoBuyLuckPotion, State.autoUseLuckPotion) then
 			return
 		end
@@ -737,13 +773,19 @@ function PotionManager.run(State)
 
 			if not ok then
 				warn("[PotionLoop ERROR]", err)
-				releasePause("PotionManager")
+				releasePause(OWNER)
+				releaseMove()
+				setNoClip(false)
+				stopMovement()
 			end
 
 			task.wait(0.25)
 		end
 
-		releasePause("PotionManager")
+		releasePause(OWNER)
+		releaseMove()
+		setNoClip(false)
+		stopMovement()
 		print("[PotionManager] loop ended")
 	end)
 

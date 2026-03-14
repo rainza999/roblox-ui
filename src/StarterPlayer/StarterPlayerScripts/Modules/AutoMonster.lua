@@ -22,7 +22,7 @@ function AutoMonster.run(State)
 	local ATTACK_RANGE = 8
 	local STOP_DISTANCE = 4
 	local SEARCH_DISTANCE = math.huge
-	local MOVE_SPEED = 60
+	local MOVE_SPEED = 55
 	local SAFE_FLY_HEIGHT = 160
 	local REPATH_DISTANCE = 18
 
@@ -72,6 +72,14 @@ function AutoMonster.run(State)
 	-------------------------------------------------
 	local function isPausedForAutoMonster()
 		return ControllerLock.isOwnedByOther(State, "AutoMonster")
+	end
+
+	local function tryAcquireMove(reason)
+		return ControllerLock.tryAcquire(State, "AutoMonster", reason)
+	end
+
+	local function releaseMove()
+		ControllerLock.release(State, "AutoMonster")
 	end
 
 	local function isBossPriorityActive()
@@ -459,74 +467,92 @@ function AutoMonster.run(State)
 	end
 
 	local function tweenTo(pos, speed)
-		local _, _, hrp = getCharacterParts()
-		speed = speed or MOVE_SPEED
-
-		cancelTween()
-		startNoclip()
-
-		local startPos = hrp.Position
-		local dist = (pos - startPos).Magnitude
-		local time = math.max(dist / speed, 0.05)
-
-		local tween = TweenService:Create(
-			hrp,
-			TweenInfo.new(time, Enum.EasingStyle.Linear),
-			{CFrame = CFrame.new(pos)}
-		)
-
-		activeTween = tween
-		tween:Play()
-
-		local startedAt = tick()
-		local lastCheckAt = tick()
-		local lastCheckPos = hrp.Position
-		local stuckCount = 0
-
-		while tween.PlaybackState == Enum.PlaybackState.Playing do
-			if not getgenv().RobloxUIRunning or not State.autoMonsterFarm then
-				tween:Cancel()
-				stopNoclip()
-				return false
-			end
-
-			if isPausedForAutoMonster() or isBossPriorityActive() then
-				tween:Cancel()
-				stopNoclip()
-				return false
-			end
-
-			if tick() - startedAt > time + 2 then
-				tween:Cancel()
-				break
-			end
-
-			if tick() - lastCheckAt >= STUCK_CHECK_INTERVAL then
-				local movedDist = (hrp.Position - lastCheckPos).Magnitude
-
-				if movedDist <= STUCK_DISTANCE_EPSILON then
-					stuckCount += 1
-					if stuckCount >= STUCK_MAX_COUNT then
-						warn("[AutoMonster] Stuck detected during tween")
-						tween:Cancel()
-						stopNoclip()
-						return false
-					end
-				else
-					stuckCount = 0
-				end
-
-				lastCheckPos = hrp.Position
-				lastCheckAt = tick()
-			end
-
-			task.wait()
+		if not tryAcquireMove("monster_move") then
+			return false
 		end
 
-		activeTween = nil
-		stopNoclip()
+		local success = false
 
-		return (hrp.Position - pos).Magnitude <= 2.5
+		local ok, err = pcall(function()
+			local _, _, hrp = getCharacterParts()
+			speed = math.clamp(speed or 55, 50, 60)
+
+			cancelTween()
+			startNoclip()
+
+			local startPos = hrp.Position
+			local dist = (pos - startPos).Magnitude
+			local time = math.max(dist / speed, 0.05)
+
+			local tween = TweenService:Create(
+				hrp,
+				TweenInfo.new(time, Enum.EasingStyle.Linear),
+				{CFrame = CFrame.new(pos)}
+			)
+
+			activeTween = tween
+			tween:Play()
+
+			local startedAt = tick()
+			local lastCheckAt = tick()
+			local lastCheckPos = hrp.Position
+			local stuckCount = 0
+
+			while tween.PlaybackState == Enum.PlaybackState.Playing do
+				if not getgenv().RobloxUIRunning or not State.autoMonsterFarm then
+					tween:Cancel()
+					stopNoclip()
+					return
+				end
+
+				if isPausedForAutoMonster() or isBossPriorityActive() then
+					tween:Cancel()
+					stopNoclip()
+					return
+				end
+
+				if tick() - startedAt > time + 2 then
+					tween:Cancel()
+					break
+				end
+
+				if tick() - lastCheckAt >= STUCK_CHECK_INTERVAL then
+					local movedDist = (hrp.Position - lastCheckPos).Magnitude
+
+					if movedDist <= STUCK_DISTANCE_EPSILON then
+						stuckCount += 1
+						if stuckCount >= STUCK_MAX_COUNT then
+							warn("[AutoMonster] Stuck detected during tween")
+							tween:Cancel()
+							stopNoclip()
+							return
+						end
+					else
+						stuckCount = 0
+					end
+
+					lastCheckPos = hrp.Position
+					lastCheckAt = tick()
+				end
+
+				task.wait()
+			end
+
+			activeTween = nil
+			stopNoclip()
+
+			success = (hrp.Position - pos).Magnitude <= 2.5
+		end)
+
+		releaseMove()
+
+		if not ok then
+			warn("[AutoMonster] tweenTo error:", err)
+			cancelTween()
+			return false
+		end
+
+		return success
 	end
 
 	local function flyTo(targetPos)
@@ -540,15 +566,15 @@ function AutoMonster.run(State)
 		local flyPos = Vector3.new(targetPos.X, midY, targetPos.Z)
 		local dropPos = targetPos
 
-		if not tweenTo(risePos, 60) then
+		if not tweenTo(risePos, MOVE_SPEED) then
 			return false
 		end
 
-		if not tweenTo(flyPos, 60) then
+		if not tweenTo(flyPos, MOVE_SPEED) then
 			return false
 		end
 
-		if not tweenTo(dropPos, 60) then
+		if not tweenTo(dropPos, MOVE_SPEED) then
 			return false
 		end
 
@@ -674,13 +700,13 @@ function AutoMonster.run(State)
 
 		-- ถ้าระดับสูงต่างกันมาก หรืออยู่คนละชั้น ไปหามอนตรง ๆ ก่อน
 		if yDiff > 6 then
-			moved = tweenTo(targetPart.Position, 60)
+			moved = tweenTo(targetPart.Position, MOVE_SPEED)
 		else
 			local standPos = getApproachPosition(targetPart, stopDistance or STOP_DISTANCE)
 			if not standPos then
 				return false
 			end
-			moved = tweenTo(standPos, 60)
+			moved = tweenTo(standPos, MOVE_SPEED)
 		end
 
 		if not moved then
@@ -764,7 +790,7 @@ function AutoMonster.run(State)
 		end
 
 		print("[AutoMonster] Move to staging for:", monsterName)
-		return tweenTo(cfg.point, 60)
+		return tweenTo(cfg.point, MOVE_SPEED)
 	end
 
 	-- -------------------------------------------------
@@ -996,7 +1022,6 @@ function AutoMonster.run(State)
 		end
 
 		if isBossPriorityActive() then
-			ControllerLock.release(State, "AutoMonster")
 			cancelTween()
 			clearRedTarget()
 			clearBlueHighlights()
@@ -1005,7 +1030,6 @@ function AutoMonster.run(State)
 		end
 
 		if not State.autoMonsterFarm then
-			ControllerLock.release(State, "AutoMonster")
 			cancelTween()
 			clearRedTarget()
 			clearBlueHighlights()
@@ -1013,7 +1037,8 @@ function AutoMonster.run(State)
 			continue
 		end
 
-		if not ControllerLock.tryAcquire(State, "AutoMonster", "monster") then
+		local currentOwner = ControllerLock.getOwner(State)
+		if currentOwner and currentOwner ~= "AutoMonster" then
 			task.wait(0.1)
 			continue
 		end
@@ -1041,8 +1066,6 @@ function AutoMonster.run(State)
 				finished = false
 			end
 
-			ControllerLock.release(State, "AutoMonster")
-
 			if finished then
 				task.wait(0.1)
 			else
@@ -1050,12 +1073,10 @@ function AutoMonster.run(State)
 			end
 		else
 			clearRedTarget()
-			ControllerLock.release(State, "AutoMonster")
 			task.wait(0.3)
 		end
 	end
 
-	ControllerLock.release(State, "AutoMonster")
 	cancelTween()
 	clearRedTarget()
 	clearBlueHighlights()

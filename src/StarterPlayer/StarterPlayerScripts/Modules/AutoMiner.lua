@@ -203,6 +203,14 @@ function AutoMiner.run(State)
         return ControllerLock.isOwnedByOther(State, "AutoMiner")
     end
 
+	local function tryAcquireMove(reason)
+		return ControllerLock.tryAcquire(State, "AutoMiner", reason)
+	end
+
+	local function releaseMove()
+		ControllerLock.release(State, "AutoMiner")
+	end
+
     local function isBossPriorityActive()
 		if not State.autoBoss then
 			return false
@@ -709,55 +717,70 @@ function AutoMiner.run(State)
 	end
 
     local function moveToTargetPart(targetPart, stopDistance)
-        if isPausedForAutoMiner() or isBossPriorityActive() then
-            return false
-        end
+		if isPausedForAutoMiner() or isBossPriorityActive() then
+			return false
+		end
 
-        if not targetPart or not targetPart.Parent then
-            return false
-        end
+		if not targetPart or not targetPart.Parent then
+			return false
+		end
 
-        local _, _, hrp = getCharacterParts()
+		if not tryAcquireMove("mining_move") then
+			return false
+		end
 
-        local standPos = getSafeStandPositionNearTarget(targetPart, stopDistance or 4)
-        if not standPos then
-            return false
-        end
+		local success = false
+		local tween = nil
 
-        noclip(true)
+		local ok, err = pcall(function()
+			local _, _, hrp = getCharacterParts()
 
-        local dist = (standPos - hrp.Position).Magnitude
-        local tweenTime = math.max(dist / 60, 0.15)
+			local standPos = getSafeStandPositionNearTarget(targetPart, stopDistance or 4)
+			if not standPos then
+				return
+			end
 
-        -- print("[AutoMiner] tween dist =", dist, " time =", tweenTime, " target =", targetPart.Name)
+			noclip(true)
 
-        local tween = TweenService:Create(
-            hrp,
-            TweenInfo.new(tweenTime, Enum.EasingStyle.Linear),
-            { CFrame = CFrame.new(standPos) }
-        )
+			local dist = (standPos - hrp.Position).Magnitude
+			local tweenTime = math.max(dist / 55, 0.15)
 
-        tween:Play()
+			tween = TweenService:Create(
+				hrp,
+				TweenInfo.new(tweenTime, Enum.EasingStyle.Linear),
+				{ CFrame = CFrame.new(standPos) }
+			)
 
-        while tween.PlaybackState == Enum.PlaybackState.Playing do
-            if isPausedForAutoMiner() or isBossPriorityActive() then
-                tween:Cancel()
-                noclip(false)
-                return false
-            end
+			tween:Play()
 
-            if not targetPart or not targetPart.Parent then
-                tween:Cancel()
-                noclip(false)
-                return false
-            end
+			while tween.PlaybackState == Enum.PlaybackState.Playing do
+				if isPausedForAutoMiner() or isBossPriorityActive() then
+					tween:Cancel()
+					return
+				end
 
-            task.wait()
-        end
+				if not targetPart or not targetPart.Parent then
+					tween:Cancel()
+					return
+				end
 
-        noclip(false)
-        return true
-    end
+				task.wait()
+			end
+
+			local _, _, hrp2 = getCharacterParts()
+			success = (hrp2.Position - standPos).Magnitude <= 6
+		end)
+
+		noclip(false)
+		releaseMove()
+
+		if not ok then
+			warn("[AutoMiner] moveToTargetPart error:", err)
+			return false
+		end
+
+		return success
+	end
 
     local function faceTargetPart(targetPart)
         local character, humanoid, hrp = getCharacterParts()
@@ -1364,7 +1387,6 @@ function AutoMiner.run(State)
         end
 
         if isBossPriorityActive() then
-            ControllerLock.release(State, "AutoMiner")
             clearPreviewMineral()
             clearActiveMineral()
             noclip(false)
@@ -1377,7 +1399,8 @@ function AutoMiner.run(State)
 			continue
 		end
 
-        if not ControllerLock.tryAcquire(State, "AutoMiner", "mining") then
+        local currentOwner = ControllerLock.getOwner(State)
+		if currentOwner and currentOwner ~= "AutoMiner" then
 			task.wait(0.1)
 			continue
 		end
@@ -1392,7 +1415,7 @@ function AutoMiner.run(State)
         local clearMineral, clearLocationName, clearMineralName = findClearTarget()
 		if clearMineral then
 			clearTrashMineral(clearMineral, clearLocationName, clearMineralName)
-            ControllerLock.release(State, "AutoMiner")
+            
 			task.wait(0.1)
 			continue
 		end
@@ -1411,7 +1434,7 @@ function AutoMiner.run(State)
             if not moved then
                 print("[AutoMiner] Failed to move to mineral:", mineral.Name)
                 markMineralSkipped(mineral, 5)
-                ControllerLock.release(State, "AutoMiner")
+                
                 clearPreviewMineral()
                 clearActiveMineral()
                 task.wait(0.2)
@@ -1424,7 +1447,7 @@ function AutoMiner.run(State)
             lastOreSummaryText = ""
             local finished = mineTarget(mineral)
 
-            ControllerLock.release(State, "AutoMiner")
+            
 
             clearActiveMineral()
 			clearPreviewMineral()
