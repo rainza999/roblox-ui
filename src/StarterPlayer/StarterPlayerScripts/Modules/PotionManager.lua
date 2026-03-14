@@ -71,6 +71,10 @@ function PotionManager.run(State)
 		return tick()
 	end
 
+	local function getCharacter()
+		return player.Character or player.CharacterAdded:Wait()
+	end
+
     local function setCollision(state)
         local character = getCharacter()
         if not character then return end
@@ -81,10 +85,6 @@ function PotionManager.run(State)
             end
         end
     end
-
-	local function getCharacter()
-		return player.Character or player.CharacterAdded:Wait()
-	end
 
 	local function getHRP()
 		local character = getCharacter()
