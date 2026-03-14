@@ -155,47 +155,49 @@ function AutoMiner.run(State)
     end
 
     local function getSafeStandPositionNearTarget(targetPart, stopDistance)
-        local character, _, hrp = getCharacterParts()
-        if not targetPart or not targetPart.Parent then
-            return nil
-        end
+		local character, _, hrp = getCharacterParts()
+		if not targetPart or not targetPart.Parent then
+			return nil
+		end
 
-        local targetPos = targetPart.Position
-        local myPos = hrp.Position
+		local targetPos = targetPart.Position
+		local myPos = hrp.Position
 
-        local flatDir = Vector3.new(
-            targetPos.X - myPos.X,
-            0,
-            targetPos.Z - myPos.Z
-        )
+		local flatDir = Vector3.new(
+			targetPos.X - myPos.X,
+			0,
+			targetPos.Z - myPos.Z
+		)
 
-        if flatDir.Magnitude <= 0.05 then
-            flatDir = Vector3.new(0, 0, -1)
-        else
-            flatDir = flatDir.Unit
-        end
+		if flatDir.Magnitude <= 0.05 then
+			flatDir = Vector3.new(0, 0, -1)
+		else
+			flatDir = flatDir.Unit
+		end
 
-        local desiredXZ = Vector3.new(
-            targetPos.X - flatDir.X * (stopDistance or 4),
-            0,
-            targetPos.Z - flatDir.Z * (stopDistance or 4)
-        )
+		local desiredXZ = Vector3.new(
+			targetPos.X - flatDir.X * (stopDistance or 4),
+			0,
+			targetPos.Z - flatDir.Z * (stopDistance or 4)
+		)
 
-        local groundY = getGroundYNear(
-            Vector3.new(desiredXZ.X, targetPos.Y + 5, desiredXZ.Z),
-            {character, targetPart.Parent}
-        )
+		local groundY = getGroundYNear(
+			Vector3.new(desiredXZ.X, targetPos.Y + 6, desiredXZ.Z),
+			{character, targetPart.Parent}
+		)
 
-        local finalY
-        if groundY then
-            finalY = groundY + 3
-        else
-            -- fallback ถ้าหาพื้นไม่เจอ
-            finalY = targetPos.Y + 2
-        end
+		local finalY
 
-        return Vector3.new(desiredXZ.X, finalY, desiredXZ.Z)
-    end
+		if groundY and math.abs(groundY - targetPos.Y) <= 6 then
+			-- ใช้พื้นได้ ถ้าอยู่ระดับใกล้กับแร่จริง
+			finalY = groundY + 2.2
+		else
+			-- ถ้าพื้นต่ำ/สูงเกินไป อย่าเชื่อ raycast ให้ยืนระดับใกล้แร่แทน
+			finalY = targetPos.Y + 1.5
+		end
+
+		return Vector3.new(desiredXZ.X, finalY, desiredXZ.Z)
+	end
 
     local function isPausedForAutoMiner()
         return ControllerLock.isOwnedByOther(State, "AutoMiner")
@@ -1145,25 +1147,25 @@ function AutoMiner.run(State)
 	end
 
 	local function moveToMiner(mineral)
-        local targetPart = getMinerPart(mineral)
-        if not targetPart then
-            return false
-        end
+		local targetPart = getMinerPart(mineral)
+		if not targetPart then
+			return false
+		end
 
-        local _, _, hrp = getCharacterParts()
-        local yDiff = math.abs(targetPart.Position.Y - hrp.Position.Y)
+		local _, _, hrp = getCharacterParts()
+		local dist = (targetPart.Position - hrp.Position).Magnitude
 
-        -- if yDiff > 40 then
-        --     warn("[AutoMiner] Skip mineral due to huge Y difference:", mineral.Name, yDiff)
-        --     return false
-        -- end
+		if dist <= 6 then
+			faceTargetPart(targetPart)
+			return true
+		end
 
-        local moved = moveToTargetPart(targetPart, 4)
-        if moved then
-            faceTargetPart(targetPart)
-        end
-        return moved
-    end
+		local moved = moveToTargetPart(targetPart, 4)
+		if moved then
+			faceTargetPart(targetPart)
+		end
+		return moved
+	end
 
 	local function mineTarget(mineral)
 		local timeout = tick() + 60
@@ -1231,19 +1233,19 @@ function AutoMiner.run(State)
 				return false
 			end
 
-            stickToTargetPart(targetPart, 2.2)
-
             local realDist = (targetPart.Position - hrp.Position).Magnitude
-            if realDist > 8 then
-                stickToTargetPart(targetPart, 2.2)
-                task.wait(0.05)
-                continue
-            end
 
-            stickToTargetPart(targetPart, 2.2)
-            faceTargetPart(targetPart)
-            mining()
-            task.wait(0.12)
+			if realDist > 8 then
+				local moved = moveToMiner(mineral)
+				if not moved then
+					noclip(false)
+					return false
+				end
+				task.wait(0.05)
+				continue
+			elseif realDist > 4.5 then
+				stickToTargetPart(targetPart, 2.2)
+			end
 
 			faceTargetPart(targetPart)
 			mining()
