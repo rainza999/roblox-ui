@@ -22,7 +22,7 @@ function AutoAttackBoss.run(State)
 	local WORLD_BOSS_CONFIG = {
 		world3 = {
 			name = "world3",
-			bossPattern = "^WORLD3_BOSS_NAME%d+$", -- เปลี่ยนเป็นชื่อบอสจริง
+			bossPattern = "^Golem%d+$", -- เปลี่ยนเป็นชื่อบอสจริง
 			scheduleType = "halfHourOpen15",
 			prepareBeforeBoss = 8,
 		},
