@@ -134,78 +134,87 @@ function PotionManager.run(State)
 	end
 
 	local function tweenToPosition(targetPos, speed)
-        local hrp = getHRP()
-        if not hrp then
-            return false
-        end
+		local hrp = getHRP()
+		local character = getCharacter()
+		if not hrp or not character then
+			return false
+		end
 
-        speed = speed or 60
-        local distance = (hrp.Position - targetPos).Magnitude
-        local duration = math.max(distance / speed, 0.15)
+		local humanoid = character:FindFirstChildOfClass("Humanoid")
+		speed = speed or 60
 
-        setCollision(false)
+		local distance = (hrp.Position - targetPos).Magnitude
+		local duration = math.max(distance / speed, 0.15)
 
-        local tween = TweenService:Create(
-            hrp,
-            TweenInfo.new(duration, Enum.EasingStyle.Linear),
-            { CFrame = CFrame.new(targetPos) }
-        )
+		setCollision(false)
 
-        local finished = false
-        local conn
+		if humanoid then
+			humanoid:ChangeState(Enum.HumanoidStateType.Physics)
+		end
 
-        conn = tween.Completed:Connect(function()
-            finished = true
-            if conn then
-                conn:Disconnect()
-                conn = nil
-            end
-        end)
+		hrp.AssemblyLinearVelocity = Vector3.zero
+		hrp.AssemblyAngularVelocity = Vector3.zero
 
-        tween:Play()
+		local tween = TweenService:Create(
+			hrp,
+			TweenInfo.new(duration, Enum.EasingStyle.Linear),
+			{ CFrame = CFrame.new(targetPos) }
+		)
 
-        local timeoutAt = now() + duration + 2
-        while now() < timeoutAt do
-            hrp = getHRP()
-            if not hrp or not hrp.Parent then
-                if conn then
-                    conn:Disconnect()
-                end
-                tween:Cancel()
-                setCollision(true)
-                return false
-            end
+		local finished = false
+		local conn
 
-            local dist = (hrp.Position - targetPos).Magnitude
-            if dist <= 3 then
-                if conn then
-                    conn:Disconnect()
-                end
-                tween:Cancel()
-                setCollision(true)
-                return true
-            end
+		conn = tween.Completed:Connect(function()
+			finished = true
+			if conn then
+				conn:Disconnect()
+				conn = nil
+			end
+		end)
 
-            if finished then
-                break
-            end
+		tween:Play()
 
-            task.wait(0.05)
-        end
+		local timeoutAt = now() + duration + 2
+		while now() < timeoutAt do
+			hrp = getHRP()
+			if not hrp or not hrp.Parent then
+				if conn then conn:Disconnect() end
+				tween:Cancel()
+				setCollision(true)
+				return false
+			end
 
-        if conn then
-            conn:Disconnect()
-        end
+			local dist = (hrp.Position - targetPos).Magnitude
+			if dist <= 6 then
+				if conn then conn:Disconnect() end
+				tween:Cancel()
+				setCollision(true)
+				return true
+			end
 
-        setCollision(true)
+			if finished then
+				break
+			end
 
-        hrp = getHRP()
-        if not hrp then
-            return false
-        end
+			task.wait(0.05)
+		end
 
-        return (hrp.Position - targetPos).Magnitude <= 5
-    end
+		if conn then
+			conn:Disconnect()
+		end
+
+		tween:Cancel()
+		task.wait(0.1)
+
+		hrp = getHRP()
+		setCollision(true)
+
+		if not hrp then
+			return false
+		end
+
+		return (hrp.Position - targetPos).Magnitude <= 8
+	end
 
 	local function getPotionBuyPosition(toolName)
 		local proximity = workspace:FindFirstChild("Proximity")
@@ -219,7 +228,7 @@ function PotionManager.run(State)
 			warn("[PotionShop] Proximity target not found:", toolName)
 			return nil
 		end
-
+		print("[PotionShop]", toolName, "class =", target.ClassName, "full =", target:GetFullName())
 		local ok, pivot = pcall(function()
 			return target.WorldPivot
 		end)
@@ -246,40 +255,71 @@ function PotionManager.run(State)
 	end
 
 	local function ensureNearPotionShop(toolName)
-        local hrp = getHRP()
-        local targetPos = getPotionBuyPosition(toolName)
+		local hrp = getHRP()
+		local targetPos = getPotionBuyPosition(toolName)
 
-        if not hrp or not targetPos then
-            debugPotionTargets()
-            warn("[PotionShop] missing targetPos or hrp for", toolName)
-            return false
-        end
+		if not hrp or not targetPos then
+			debugPotionTargets()
+			warn("[PotionShop] missing targetPos or hrp for", toolName)
+			return false
+		end
 
-        local movePos = Vector3.new(targetPos.X, targetPos.Y + 3, targetPos.Z)
+		local currentPos = hrp.Position
+		local flatDir = Vector3.new(targetPos.X - currentPos.X, 0, targetPos.Z - currentPos.Z)
 
-        print(
-            "[PotionShop] exact target for",
-            toolName,
-            "=>",
-            math.floor(movePos.X),
-            math.floor(movePos.Y),
-            math.floor(movePos.Z)
-        )
+		if flatDir.Magnitude < 0.001 then
+			flatDir = Vector3.new(0, 0, -1)
+		else
+			flatDir = flatDir.Unit
+		end
 
-        local dist = (hrp.Position - movePos).Magnitude
-        if dist <= 2 then
-            return true
-        end
+		-- อย่าไปทับ object ตรงๆ ให้ยืนหน้าเป้าแทน
+		local standOff = 5
+		local movePos = Vector3.new(
+			targetPos.X - flatDir.X * standOff,
+			targetPos.Y + 2,
+			targetPos.Z - flatDir.Z * standOff
+		)
 
-        local ok = tweenToPosition(movePos, 60)
-        if not ok then
-            warn("[PotionShop] tween failed for", toolName)
-            return false
-        end
+		print(
+			"[PotionShop] exact target for",
+			toolName,
+			"=>",
+			math.floor(targetPos.X),
+			math.floor(targetPos.Y),
+			math.floor(targetPos.Z),
+			"| move to =>",
+			math.floor(movePos.X),
+			math.floor(movePos.Y),
+			math.floor(movePos.Z)
+		)
 
-        task.wait(0.15)
-        return true
-    end
+		local distToMove = (hrp.Position - movePos).Magnitude
+		if distToMove <= 4 then
+			return true
+		end
+
+		local ok = tweenToPosition(movePos, 60)
+		if not ok then
+			warn("[PotionShop] tween failed for", toolName)
+
+			-- fallback: วาร์ปสั้นๆ ไปใกล้อีกนิด
+			local hrp2 = getHRP()
+			if hrp2 then
+				hrp2.CFrame = CFrame.new(movePos)
+				task.wait(0.15)
+
+				if (hrp2.Position - movePos).Magnitude <= 8 then
+					return true
+				end
+			end
+
+			return false
+		end
+
+		task.wait(0.15)
+		return true
+	end
 
 	local function findToolInstance(toolName)
 		local backpack = getBackpack()
