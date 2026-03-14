@@ -175,8 +175,16 @@ function AutoMonster.run(State)
 	-------------------------------------------------
 	-- Attack
 	-------------------------------------------------
+	local lastAttackAt = 0
+	local ATTACK_COOLDOWN = 0.28
+
 	local function attack()
-		pcall(function()
+		if tick() - lastAttackAt < ATTACK_COOLDOWN then
+			return false
+		end
+		lastAttackAt = tick()
+
+		local ok, err = pcall(function()
 			ReplicatedStorage
 				:WaitForChild("Shared")
 				:WaitForChild("Packages")
@@ -187,6 +195,13 @@ function AutoMonster.run(State)
 				:WaitForChild("ToolActivated")
 				:InvokeServer("Weapon")
 		end)
+
+		if not ok then
+			warn("[AutoMonster] attack failed:", err)
+			return false
+		end
+
+		return true
 	end
 
 	-------------------------------------------------
@@ -905,7 +920,8 @@ function AutoMonster.run(State)
 
 			-- ยังไกลอยู่ ค่อยเข้าหา
 			if dist > REPOSITION_TRIGGER then
-				local moved = tweenTo(part.Position, 60)
+				-- local moved = tweenTo(part.Position, 60)
+				local moved = moveToTargetPart(part, STOP_DISTANCE)
 				if not moved then
 					repathFailures += 1
 					if repathFailures >= maxRepathFailures then
@@ -1014,7 +1030,16 @@ function AutoMonster.run(State)
 			setRedTarget(monster)
 			print("[AutoMonster] Found target:", monster.Name)
 
-			local finished = attackMonster(monster)
+			-- local finished = attackMonster(monster)
+			local finished = false
+			local ok, err = xpcall(function()
+				finished = attackMonster(monster)
+			end, debug.traceback)
+
+			if not ok then
+				warn("[AutoMonster] crash in attackMonster:\n" .. tostring(err))
+				finished = false
+			end
 
 			ControllerLock.release(State, "AutoMonster")
 
