@@ -10,12 +10,185 @@ function AutoAttackBoss.run(State)
 	State.bossNextRunAt = State.bossNextRunAt or 0
 	State.autoNpcBusy = State.autoNpcBusy or false
 	State.bossImmediateRun = State.bossImmediateRun == nil and true or State.bossImmediateRun
+	State.lastDetectedWorld = State.lastDetectedWorld or nil
+	State.lastBossScheduleWorld = State.lastBossScheduleWorld or nil
 
 	local TweenService = game:GetService("TweenService")
 	local Players = game:GetService("Players")
 	local ReplicatedStorage = game:GetService("ReplicatedStorage")
 	local VirtualInputManager = game:GetService("VirtualInputManager")
 	local player = Players.LocalPlayer
+
+	local WORLD_BOSS_CONFIG = {
+		world3 = {
+			name = "world3",
+			bossPattern = "^WORLD3_BOSS_NAME%d+$", -- เปลี่ยนเป็นชื่อบอสจริง
+			scheduleType = "halfHourOpen15",
+			prepareBeforeBoss = 8,
+		},
+		world4 = {
+			name = "world4",
+			bossPattern = "^Asura's Incarnate%d+$",
+			scheduleType = "every5",
+			prepareBeforeBoss = 8,
+		},
+	}
+
+	local function normalizeName(name)
+		name = tostring(name or "")
+		name = string.lower(name)
+		name = name:gsub("%d+$", "")
+		name = name:gsub("^%s+", "")
+		name = name:gsub("%s+$", "")
+		return name
+	end
+
+	local function hasAliveMonster(monsterName)
+		local living = workspace:FindFirstChild("Living")
+		if not living then
+			return false
+		end
+
+		local target = normalizeName(monsterName)
+
+		for _, mob in ipairs(living:GetChildren()) do
+			if mob:IsA("Model") and normalizeName(mob.Name) == target then
+				local hum = mob:FindFirstChildOfClass("Humanoid") or mob:FindFirstChildWhichIsA("Humanoid", true)
+				if not hum or hum.Health > 0 then
+					return true
+				end
+			end
+		end
+
+		return false
+	end
+
+	local function hasAliveMineral(mineralName)
+		local rocks = workspace:FindFirstChild("Rocks")
+		if not rocks then
+			return false
+		end
+
+		local target = normalizeName(mineralName)
+
+		for _, mapFolder in ipairs(rocks:GetChildren()) do
+			for _, obj in ipairs(mapFolder:GetDescendants()) do
+				if normalizeName(obj.Name) == target then
+					local hpAttr = obj:GetAttribute("Health")
+					if type(hpAttr) == "number" then
+						if hpAttr > 0 then
+							return true
+						end
+					else
+						local hp = obj:FindFirstChild("Health")
+						if hp and (hp:IsA("NumberValue") or hp:IsA("IntValue")) then
+							if hp.Value > 0 then
+								return true
+							end
+						else
+							return true
+						end
+					end
+				end
+			end
+		end
+
+		return false
+	end
+
+	local function detectCurrentWorldName()
+		local hasSmallIceCrystal = hasAliveMineral("Small Ice Crystal")
+		local hasCrystalSpider = hasAliveMonster("Crystal Spider")
+
+		if hasSmallIceCrystal and hasCrystalSpider then
+			return "world3"
+		end
+
+		local hasGlowyRock = hasAliveMineral("Glowy Rock")
+		local hasBruteOni = hasAliveMonster("Brute Oni")
+
+		if hasGlowyRock and hasBruteOni then
+			return "world4"
+		end
+
+		return "unknown"
+	end
+
+	local function getCurrentWorldConfig()
+		local worldName = detectCurrentWorldName()
+
+		if worldName ~= "unknown" then
+			State.lastDetectedWorld = worldName
+		end
+
+		local finalWorld = worldName ~= "unknown" and worldName or State.lastDetectedWorld
+		return WORLD_BOSS_CONFIG[finalWorld], finalWorld or "unknown"
+	end
+
+	local function getNext5MinuteTimestamp()
+		local now = os.time()
+		return now - (now % 300) + 300
+	end
+
+	local function isInHalfHourOpen15Window(now)
+		now = now or os.time()
+		local t = os.date("*t", now)
+		return (t.min >= 0 and t.min < 15) or (t.min >= 30 and t.min < 45)
+	end
+
+	local function getCurrentOrNextHalfHourWindowTimestamp(now)
+		now = now or os.time()
+		local t = os.date("*t", now)
+
+		local base = now - (t.min * 60) - t.sec
+
+		if t.min < 15 then
+			return base
+		elseif t.min < 30 then
+			return base + ((30 - t.min) * 60)
+		elseif t.min < 45 then
+			return base - ((t.min - 30) * 60)
+		else
+			return base + ((60 - t.min) * 60)
+		end
+	end
+
+	local function getCurrentOrNextBossTimestampByWorld(worldCfg, now)
+		now = now or os.time()
+
+		if not worldCfg then
+			return getNext5MinuteTimestamp()
+		end
+
+		if worldCfg.scheduleType == "every5" then
+			return getNext5MinuteTimestamp()
+		end
+
+		if worldCfg.scheduleType == "halfHourOpen15" then
+			return getCurrentOrNextHalfHourWindowTimestamp(now)
+		end
+
+		return getNext5MinuteTimestamp()
+	end
+
+	local function getNextBossTimestampAfterFinish(worldCfg, now)
+		now = now or os.time()
+
+		if not worldCfg then
+			return getNext5MinuteTimestamp()
+		end
+
+		if worldCfg.scheduleType == "every5" then
+			return getNext5MinuteTimestamp()
+		end
+
+		if worldCfg.scheduleType == "halfHourOpen15" then
+			local currentWindow = getCurrentOrNextHalfHourWindowTimestamp(now)
+			return currentWindow + 1800
+		end
+
+		return getNext5MinuteTimestamp()
+	end
 
 	local function getCharacter()
 		return player.Character or player.CharacterAdded:Wait()
@@ -26,11 +199,6 @@ function AutoAttackBoss.run(State)
 		local humanoid = character:WaitForChild("Humanoid")
 		local hrp = character:WaitForChild("HumanoidRootPart")
 		return character, humanoid, hrp
-	end
-
-	local function getNext5MinuteTimestamp()
-		local now = os.time()
-		return now - (now % 300) + 300
 	end
 
 	local function clearBossFlags()
@@ -189,7 +357,15 @@ function AutoAttackBoss.run(State)
 		return false
 	end
 
+	local lastAttackAt = 0
+	local ATTACK_COOLDOWN = 0.28
+
 	local function attack()
+		if tick() - lastAttackAt < ATTACK_COOLDOWN then
+			return false
+		end
+		lastAttackAt = tick()
+
 		local ok, err = pcall(function()
 			ReplicatedStorage
 				:WaitForChild("Shared")
@@ -271,6 +447,17 @@ function AutoAttackBoss.run(State)
 		State.bossPriorityActive = true
 		State.autoNpcBusy = true
 
+		local worldCfg, worldName = getCurrentWorldConfig()
+
+		if not worldCfg then
+			warn("[AutoAttackBoss] Unknown world, cannot start boss")
+			clearBossFlags()
+			State.bossNextRunAt = getNext5MinuteTimestamp()
+			return false
+		end
+
+		print("[AutoAttackBoss] Detected world:", worldName)
+
 		local startTime = os.time()
 		print("เริ่มรอบบอส:", os.date("%H:%M:%S", startTime))
 
@@ -280,7 +467,7 @@ function AutoAttackBoss.run(State)
 		if not createParty or not doorPart then
 			warn("createParty or doorPart not found")
 			clearBossFlags()
-			State.bossNextRunAt = getNext5MinuteTimestamp()
+			State.bossNextRunAt = getCurrentOrNextBossTimestampByWorld(worldCfg, os.time())
 			return false
 		end
 
@@ -331,7 +518,7 @@ function AutoAttackBoss.run(State)
 		local living = workspace:FindFirstChild("Living")
 
 		if living then
-			local bossModel = waitForBoss(living, "^Asura's Incarnate%d+$", 30)
+			local bossModel = waitForBoss(living, worldCfg.bossPattern, 30)
 
 			if bossModel then
 				print("Found boss:", bossModel.Name)
@@ -351,14 +538,12 @@ function AutoAttackBoss.run(State)
 		-- สำคัญ: ปล่อย flag ทันทีหลังจบรอบ เพื่อให้ AutoMiner กลับไปทำงาน
 		clearBossFlags()
 
-		-- รอบถัดไป = นาที %5 ถัดไป
-		State.bossNextRunAt = getNext5MinuteTimestamp()
+		State.bossNextRunAt = getNextBossTimestampAfterFinish(worldCfg, os.time())
 		print("รอบบอสถัดไป:", os.date("%H:%M:%S", State.bossNextRunAt))
 
 		return success
 	end
 
-	local PREPARE_BEFORE_BOSS = 8
 
 	while getgenv().RobloxUIRunning do
 		if not State.autoBoss then
@@ -373,31 +558,73 @@ function AutoAttackBoss.run(State)
 
 		-- รอบแรก เปิดแล้วไปเลย
 		if State.bossImmediateRun then
-			print("Immediate first boss run")
+			local worldCfg, worldName = getCurrentWorldConfig()
 			State.bossImmediateRun = false
-			runBossRound()
+
+			if State.lastBossScheduleWorld ~= worldName then
+				State.lastBossScheduleWorld = worldName
+				State.bossNextRunAt = 0
+			end
+
+
+			if not worldCfg then
+				warn("[AutoAttackBoss] Unknown world on immediate run")
+				task.wait(0.2)
+				continue
+			end
+
+			if worldCfg.scheduleType == "halfHourOpen15" then
+				if isInHalfHourOpen15Window(os.time()) then
+					print("Immediate first boss run:", worldName)
+					runBossRound()
+				else
+					State.bossNextRunAt = getCurrentOrNextBossTimestampByWorld(worldCfg, os.time())
+					print("[AutoAttackBoss] " .. worldName .. " not in open window, next run at:", os.date("%H:%M:%S", State.bossNextRunAt))
+				end
+			else
+				print("Immediate first boss run:", worldName)
+				runBossRound()
+			end
+
 			task.wait(0.2)
 			continue
 		end
 
-		-- ถ้ายังไม่มีรอบ ให้ set รอบ %5 ถัดไป
+		local worldCfg, worldName = getCurrentWorldConfig()
+
+		if State.lastBossScheduleWorld ~= worldName then
+			State.lastBossScheduleWorld = worldName
+			State.bossNextRunAt = 0
+		end
+
+		if not worldCfg then
+			State.bossPriorityActive = false
+			task.wait(0.5)
+			continue
+		end
+
+		local PREPARE_BEFORE_BOSS = worldCfg.prepareBeforeBoss or 8
+
 		if State.bossNextRunAt == 0 then
-			State.bossNextRunAt = getNext5MinuteTimestamp()
+			State.bossNextRunAt = getCurrentOrNextBossTimestampByWorld(worldCfg, os.time())
 		end
 
 		now = os.time()
 
-		-- ถ้าเลยรอบไปแล้ว ให้เริ่มบอสเลย
 		if now >= State.bossNextRunAt then
+			if worldCfg.scheduleType == "halfHourOpen15" and not isInHalfHourOpen15Window(now) then
+				State.bossNextRunAt = getCurrentOrNextBossTimestampByWorld(worldCfg, now)
+				task.wait(0.2)
+				continue
+			end
+
 			runBossRound()
 			task.wait(0.2)
 			continue
 		end
-
-		-- ใกล้ถึงรอบ ค่อยบล็อก miner
 		if now >= (State.bossNextRunAt - PREPARE_BEFORE_BOSS) then
 			if not State.bossPriorityActive then
-				print("Boss priority active:", os.date("%H:%M:%S", now), "next =", os.date("%H:%M:%S", State.bossNextRunAt))
+				print("Boss priority active:", os.date("%H:%M:%S", now), "next =", os.date("%H:%M:%S", State.bossNextRunAt), "world =", worldName)
 			end
 			State.bossPriorityActive = true
 		else

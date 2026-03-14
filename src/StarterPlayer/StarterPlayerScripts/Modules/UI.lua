@@ -239,7 +239,7 @@ function UI.create(state)
 	-- Window
 	-------------------------------------------------
 	local expandedSize = UDim2.new(0, 760, 0, 840)
-	local collapsedSize = UDim2.new(0, 760, 0, 58)
+	local collapsedSize = UDim2.new(0, 220, 0, 58)
 	local maximizedSize = UDim2.new(1, -30, 1, -30)
 
 	local isCollapsed = false
@@ -1018,7 +1018,7 @@ function UI.create(state)
 	-- end
 
 	local normalAnchor = Vector2.new(0.5, 0.5)
-	local collapsedAnchor = Vector2.new(0, 0.5)
+	local collapsedAnchor = Vector2.new(0, 0)
 
 	local function setCollapsed(collapsed)
 		isCollapsed = collapsed
@@ -1034,7 +1034,7 @@ function UI.create(state)
 
 			frame.AnchorPoint = collapsedAnchor
 			frame:TweenPosition(
-				UDim2.new(0, 12, 0.5, 0),
+				UDim2.new(0, 12, 0.5, 50),
 				Enum.EasingDirection.Out,
 				Enum.EasingStyle.Quad,
 				0.15,
@@ -1136,9 +1136,9 @@ function UI.create(state)
 			maxBtn.Text = "[]"
 		else
 			if isCollapsed then
-				frame.AnchorPoint = Vector2.new(0, 0.5)
+				frame.AnchorPoint = Vector2.new(0, 0)
 				frame:TweenPosition(
-					UDim2.new(0, 12, 0.5, 0),
+					UDim2.new(0, 12, 0, 50),
 					Enum.EasingDirection.Out,
 					Enum.EasingStyle.Quad,
 					0.15,
