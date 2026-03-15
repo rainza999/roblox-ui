@@ -255,57 +255,38 @@ function AutoAttackBoss.run(State)
 	end
 
 	local function findCreatePartyStuff()
+		-- world4 style
 		local createParty = workspace:FindFirstChild("CreateParty", true)
-		print("[AutoAttackBoss] createParty =", createParty and createParty:GetFullName())
 
-		if not createParty then
-			return nil, nil, nil, nil
+		if createParty then
+			local prompt = createParty:FindFirstChildWhichIsA("ProximityPrompt", true)
+			local part = createParty:IsA("BasePart") and createParty or createParty:FindFirstChildWhichIsA("BasePart", true)
+
+			print("[AutoAttackBoss] Using CreateParty path:", createParty:GetFullName())
+
+			return createParty, nil, nil, part
 		end
 
-		local gate = createParty:FindFirstChild("Gate", true)
-		local bossDoor = nil
-		local doorPart = nil
 
-		if gate then
-			bossDoor = gate:FindFirstChild("bossDoor", true)
-		end
+		-- world3 style
+		local assets = workspace:FindFirstChild("Assets")
+		if assets then
+			local gate = assets:FindFirstChild("Gate")
+			if gate then
+				local bossDoor = gate:FindFirstChild("bossDoor")
 
-		if bossDoor then
-			doorPart = bossDoor:IsA("BasePart") and bossDoor or bossDoor:FindFirstChildWhichIsA("BasePart", true)
-		end
+				if bossDoor then
+					local part = bossDoor:IsA("BasePart") and bossDoor or bossDoor:FindFirstChildWhichIsA("BasePart", true)
 
-		-- fallback 1: หา object ชื่อ bossDoor ตรงไหนก็ได้ใต้ CreateParty
-		if not doorPart then
-			local foundBossDoor = createParty:FindFirstChild("bossDoor", true)
-			if foundBossDoor then
-				bossDoor = foundBossDoor
-				doorPart = foundBossDoor:IsA("BasePart") and foundBossDoor or foundBossDoor:FindFirstChildWhichIsA("BasePart", true)
-			end
-		end
+					print("[AutoAttackBoss] Using Assets.Gate.bossDoor path:", bossDoor:GetFullName())
 
-		-- fallback 2: หา part ที่ชื่อมีคำว่า door / gate
-		if not doorPart then
-			for _, obj in ipairs(createParty:GetDescendants()) do
-				if obj:IsA("BasePart") then
-					local n = string.lower(obj.Name)
-					if string.find(n, "door") or string.find(n, "gate") then
-						doorPart = obj
-						break
-					end
+					return bossDoor, gate, bossDoor, part
 				end
 			end
 		end
 
-		-- fallback 3: เอา part แรกใน CreateParty ไปก่อน
-		if not doorPart then
-			doorPart = createParty:FindFirstChildWhichIsA("BasePart", true)
-		end
-
-		print("[AutoAttackBoss] gate =", gate and gate:GetFullName())
-		print("[AutoAttackBoss] bossDoor =", bossDoor and bossDoor:GetFullName())
-		print("[AutoAttackBoss] doorPart =", doorPart and doorPart:GetFullName())
-
-		return createParty, gate, bossDoor, doorPart
+		warn("[AutoAttackBoss] boss door not found")
+		return nil, nil, nil, nil
 	end
 
 	local function waitForBoss(living, pattern, timeout)
@@ -528,7 +509,9 @@ function AutoAttackBoss.run(State)
 			return false
 		end
 
-		local cf = doorPart.CFrame
+		-- local cf = doorPart.CFrame
+		local movePos = doorPart.Position + Vector3.new(0,2,4)
+		local cf = CFrame.new(movePos)
 		local dist = (cf.Position - hrp.Position).Magnitude
 		noclip(true)
 
