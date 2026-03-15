@@ -188,13 +188,15 @@ function AutoMiner.run(State)
 
 		local finalY
 
-		if groundY and math.abs(groundY - targetPos.Y) <= 6 then
-			-- ใช้พื้นได้ ถ้าอยู่ระดับใกล้กับแร่จริง
-			finalY = groundY + 2.2
+		if groundY and math.abs(groundY - myPos.Y) <= 8 then
+			finalY = groundY + 2
 		else
-			-- ถ้าพื้นต่ำ/สูงเกินไป อย่าเชื่อ raycast ให้ยืนระดับใกล้แร่แทน
-			finalY = targetPos.Y + 1.5
+			-- ใช้ระดับเราเดิม ไม่ใช่ระดับหัวแร่
+			finalY = myPos.Y
 		end
+
+		-- clamp ไม่ให้สูงเกินเป้าหมายมาก
+		finalY = math.min(finalY, targetPos.Y + 2)
 
 		return Vector3.new(desiredXZ.X, finalY, desiredXZ.Z)
 	end
@@ -801,56 +803,64 @@ function AutoMiner.run(State)
     end
 
     local function stickToTargetPart(targetPart, stickDistance)
-        local character, _, hrp = getCharacterParts()
-        if not targetPart or not targetPart.Parent then
-            return false
-        end
+		local _, _, hrp = getCharacterParts()
+		if not targetPart or not targetPart.Parent then
+			return false
+		end
 
-        local targetPos = targetPart.Position
-        local myPos = hrp.Position
-        local desiredDistance = stickDistance or 2.2
+		local targetPos = targetPart.Position
+		local myPos = hrp.Position
+		local desiredDistance = stickDistance or 2.2
 
-        local flatDir = Vector3.new(
-            targetPos.X - myPos.X,
-            0,
-            targetPos.Z - myPos.Z
-        )
+		local flatDir = Vector3.new(
+			targetPos.X - myPos.X,
+			0,
+			targetPos.Z - myPos.Z
+		)
 
-        if flatDir.Magnitude <= 0.05 then
-            faceTargetPart(targetPart)
-            return true
-        end
+		if flatDir.Magnitude <= 0.05 then
+			faceTargetPart(targetPart)
+			return true
+		end
 
-        flatDir = flatDir.Unit
+		flatDir = flatDir.Unit
 
-        local desiredXZ = Vector3.new(
-            targetPos.X - flatDir.X * desiredDistance,
-            0,
-            targetPos.Z - flatDir.Z * desiredDistance
-        )
+		local desiredXZ = Vector3.new(
+			targetPos.X - flatDir.X * desiredDistance,
+			0,
+			targetPos.Z - flatDir.Z * desiredDistance
+		)
 
-        local groundY = getGroundYNear(
-            Vector3.new(desiredXZ.X, targetPos.Y + 5, desiredXZ.Z),
-            {character, targetPart.Parent}
-        )
+		-- สำคัญ: อย่าเด้ง Y ไปตามหัวแร่
+		-- ให้ใช้ระดับเดิมของตัวเราเป็นหลัก
+		local desiredPos = Vector3.new(
+			desiredXZ.X,
+			myPos.Y,
+			desiredXZ.Z
+		)
 
-        local finalY
-        if groundY then
-            finalY = groundY + 1.25
-        else
-            finalY = math.max(myPos.Y, targetPos.Y)
-        end
+		-- ถ้าต่างกันเยอะเกิน ไม่ต้อง snap
+		if math.abs(desiredPos.Y - myPos.Y) > 2 then
+			faceTargetPart(targetPart)
+			return false
+		end
 
-        local desiredPos = Vector3.new(desiredXZ.X, finalY, desiredXZ.Z)
+		-- ขยับเฉพาะกรณีใกล้ ๆ และขยับไม่มาก
+		local moveDelta = (desiredPos - myPos).Magnitude
+		if moveDelta > 3 then
+			faceTargetPart(targetPart)
+			return false
+		end
 
-        noclip(true)
-        hrp.CFrame = CFrame.lookAt(
-            desiredPos,
-            Vector3.new(targetPos.X, desiredPos.Y, targetPos.Z)
-        )
-        noclip(false)
-        return true
-    end
+		noclip(true)
+		hrp.CFrame = CFrame.lookAt(
+			desiredPos,
+			Vector3.new(targetPos.X, desiredPos.Y, targetPos.Z)
+		)
+		noclip(false)
+
+		return true
+	end
 
     -------------------------------------------------
 	-- Mineral Highlight
@@ -1267,10 +1277,9 @@ function AutoMiner.run(State)
 				task.wait(0.05)
 				continue
 			elseif realDist > 4.5 then
-				stickToTargetPart(targetPart, 2.2)
+				faceTargetPart(targetPart)
 			end
 
-			faceTargetPart(targetPart)
 			mining()
 			task.wait(0.12)
 
