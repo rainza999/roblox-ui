@@ -241,6 +241,8 @@ function AutoAttackBoss.run(State)
 
 	local function findCreatePartyStuff()
 		local createParty = workspace:FindFirstChild("CreateParty", true)
+		print("[AutoAttackBoss] createParty =", createParty and createParty:GetFullName())
+
 		if not createParty then
 			return nil, nil, nil, nil
 		end
@@ -248,6 +250,10 @@ function AutoAttackBoss.run(State)
 		local gate = createParty:FindFirstChild("Gate")
 		local bossDoor = gate and gate:FindFirstChild("bossDoor")
 		local doorPart = bossDoor and bossDoor:FindFirstChildWhichIsA("BasePart")
+
+		print("[AutoAttackBoss] gate =", gate and gate:GetFullName())
+		print("[AutoAttackBoss] bossDoor =", bossDoor and bossDoor:GetFullName())
+		print("[AutoAttackBoss] doorPart =", doorPart and doorPart:GetFullName())
 
 		return createParty, gate, bossDoor, doorPart
 	end
