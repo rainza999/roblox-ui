@@ -1,7 +1,7 @@
 local AutoAttackBoss = {}
 
 function AutoAttackBoss.run(State)
-	print("AutoAttackBoss started")
+	print("AutoAttackBoss started222222")
 
 	assert(State, "AutoAttackBoss.run(State) missing State")
 
