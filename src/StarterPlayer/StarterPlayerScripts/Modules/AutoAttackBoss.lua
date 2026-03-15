@@ -130,27 +130,38 @@ function AutoAttackBoss.run(State)
 		return now - (now % 300) + 300
 	end
 
-	local function isInHalfHourOpen15Window(now)
+	local function getHalfHourWindowStart(now)
 		now = now or os.time()
 		local t = os.date("*t", now)
-		return (t.min >= 0 and t.min < 15) or (t.min >= 30 and t.min < 45)
-	end
-
-	local function getCurrentOrNextHalfHourWindowTimestamp(now)
-		now = now or os.time()
-		local t = os.date("*t", now)
-
-		local base = now - (t.min * 60) - t.sec
+		local hourStart = now - (t.min * 60) - t.sec
 
 		if t.min < 15 then
-			return base
+			return hourStart -- xx:00
 		elseif t.min < 30 then
-			return base + ((30 - t.min) * 60)
+			return hourStart + 1800 -- next is xx:30
 		elseif t.min < 45 then
-			return base - ((t.min - 30) * 60)
+			return hourStart + 1800 -- xx:30
 		else
-			return base + ((60 - t.min) * 60)
+			return hourStart + 3600 -- next is next hour :00
 		end
+	end
+
+	local function getCurrentOrNextBossTimestampByWorld(worldCfg, now)
+		now = now or os.time()
+
+		if not worldCfg then
+			return getNext5MinuteTimestamp()
+		end
+
+		if worldCfg.scheduleType == "every5" then
+			return getNext5MinuteTimestamp()
+		end
+
+		if worldCfg.scheduleType == "halfHourOpen15" then
+			return getHalfHourWindowStart(now)
+		end
+
+		return getNext5MinuteTimestamp()
 	end
 
 	local function getCurrentOrNextBossTimestampByWorld(worldCfg, now)
@@ -183,8 +194,18 @@ function AutoAttackBoss.run(State)
 		end
 
 		if worldCfg.scheduleType == "halfHourOpen15" then
-			local currentWindow = getCurrentOrNextHalfHourWindowTimestamp(now)
-			return currentWindow + 1800
+			local t = os.date("*t", now)
+			local hourStart = now - (t.min * 60) - t.sec
+
+			if t.min < 15 then
+				return hourStart + 1800 -- xx:30
+			elseif t.min < 30 then
+				return hourStart + 1800 -- xx:30
+			elseif t.min < 45 then
+				return hourStart + 3600 -- next hour :00
+			else
+				return hourStart + 3600 -- next hour :00
+			end
 		end
 
 		return getNext5MinuteTimestamp()
@@ -579,8 +600,8 @@ function AutoAttackBoss.run(State)
 		clearBossFlags()
 
 		State.bossNextRunAt = getNextBossTimestampAfterFinish(worldCfg, os.time())
-		print("รอบบอสถัดไป:", os.date("%H:%M:%S", State.bossNextRunAt))
-
+		print("[AutoAttackBoss] next boss for", worldName, "=", os.date("%H:%M:%S", State.bossNextRunAt))
+		
 		return success
 	end
 
