@@ -130,6 +130,12 @@ function AutoAttackBoss.run(State)
 		return now - (now % 300) + 300
 	end
 
+	local function isInHalfHourOpen15Window(now)
+		now = now or os.time()
+		local t = os.date("*t", now)
+		return (t.min >= 0 and t.min < 15) or (t.min >= 30 and t.min < 45)
+	end
+
 	local function getHalfHourWindowStart(now)
 		now = now or os.time()
 		local t = os.date("*t", now)
@@ -144,24 +150,6 @@ function AutoAttackBoss.run(State)
 		else
 			return hourStart + 3600 -- next is next hour :00
 		end
-	end
-
-	local function getCurrentOrNextBossTimestampByWorld(worldCfg, now)
-		now = now or os.time()
-
-		if not worldCfg then
-			return getNext5MinuteTimestamp()
-		end
-
-		if worldCfg.scheduleType == "every5" then
-			return getNext5MinuteTimestamp()
-		end
-
-		if worldCfg.scheduleType == "halfHourOpen15" then
-			return getHalfHourWindowStart(now)
-		end
-
-		return getNext5MinuteTimestamp()
 	end
 
 	local function getCurrentOrNextBossTimestampByWorld(worldCfg, now)
@@ -601,7 +589,7 @@ function AutoAttackBoss.run(State)
 
 		State.bossNextRunAt = getNextBossTimestampAfterFinish(worldCfg, os.time())
 		print("[AutoAttackBoss] next boss for", worldName, "=", os.date("%H:%M:%S", State.bossNextRunAt))
-		
+
 		return success
 	end
 
