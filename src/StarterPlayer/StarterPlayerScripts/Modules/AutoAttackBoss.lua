@@ -239,6 +239,21 @@ function AutoAttackBoss.run(State)
 		end
 	end
 
+	local function debugCreateParty()
+		local createParty = workspace:FindFirstChild("CreateParty", true)
+		if not createParty then
+			warn("[AutoAttackBoss] CreateParty not found")
+			return
+		end
+
+		print("===== CreateParty Descendants =====")
+		for _, obj in ipairs(createParty:GetDescendants()) do
+			if obj:IsA("BasePart") or obj:IsA("Model") or obj:IsA("Folder") then
+				print(obj:GetFullName(), "|", obj.ClassName)
+			end
+		end
+	end
+
 	local function findCreatePartyStuff()
 		local createParty = workspace:FindFirstChild("CreateParty", true)
 		print("[AutoAttackBoss] createParty =", createParty and createParty:GetFullName())
@@ -247,9 +262,44 @@ function AutoAttackBoss.run(State)
 			return nil, nil, nil, nil
 		end
 
-		local gate = createParty:FindFirstChild("Gate")
-		local bossDoor = gate and gate:FindFirstChild("bossDoor")
-		local doorPart = bossDoor and bossDoor:FindFirstChildWhichIsA("BasePart")
+		local gate = createParty:FindFirstChild("Gate", true)
+		local bossDoor = nil
+		local doorPart = nil
+
+		if gate then
+			bossDoor = gate:FindFirstChild("bossDoor", true)
+		end
+
+		if bossDoor then
+			doorPart = bossDoor:IsA("BasePart") and bossDoor or bossDoor:FindFirstChildWhichIsA("BasePart", true)
+		end
+
+		-- fallback 1: หา object ชื่อ bossDoor ตรงไหนก็ได้ใต้ CreateParty
+		if not doorPart then
+			local foundBossDoor = createParty:FindFirstChild("bossDoor", true)
+			if foundBossDoor then
+				bossDoor = foundBossDoor
+				doorPart = foundBossDoor:IsA("BasePart") and foundBossDoor or foundBossDoor:FindFirstChildWhichIsA("BasePart", true)
+			end
+		end
+
+		-- fallback 2: หา part ที่ชื่อมีคำว่า door / gate
+		if not doorPart then
+			for _, obj in ipairs(createParty:GetDescendants()) do
+				if obj:IsA("BasePart") then
+					local n = string.lower(obj.Name)
+					if string.find(n, "door") or string.find(n, "gate") then
+						doorPart = obj
+						break
+					end
+				end
+			end
+		end
+
+		-- fallback 3: เอา part แรกใน CreateParty ไปก่อน
+		if not doorPart then
+			doorPart = createParty:FindFirstChildWhichIsA("BasePart", true)
+		end
 
 		print("[AutoAttackBoss] gate =", gate and gate:GetFullName())
 		print("[AutoAttackBoss] bossDoor =", bossDoor and bossDoor:GetFullName())
@@ -468,6 +518,7 @@ function AutoAttackBoss.run(State)
 		print("เริ่มรอบบอส:", os.date("%H:%M:%S", startTime))
 
 		local _, _, hrp = getCharacterParts()
+		debugCreateParty()
 		local createParty, _, _, doorPart = findCreatePartyStuff()
 
 		if not createParty or not doorPart then
