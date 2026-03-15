@@ -164,7 +164,7 @@ function AutoAttackBoss.run(State)
 		end
 
 		if worldCfg.scheduleType == "halfHourOpen15" then
-			return getCurrentOrNextHalfHourWindowTimestamp(now)
+			return getHalfHourWindowStart(now)
 		end
 
 		return getNext5MinuteTimestamp()
