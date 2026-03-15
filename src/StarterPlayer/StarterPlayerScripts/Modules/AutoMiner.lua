@@ -23,13 +23,16 @@ function AutoMiner.run(State)
 		return player.Character or player.CharacterAdded:Wait()
 	end
 
-    hasEquippedMiningTool = function()
-        local character = getCharacter()
+    -- hasEquippedMiningTool = function()
+    --     local character = getCharacter()
 
-        return character:FindFirstChild("PickAxe")
-            or character:FindFirstChild("PickaxeModel")
-    end
+    --     return character:FindFirstChild("PickAxe")
+    --         or character:FindFirstChild("PickaxeModel")
+    -- end
 
+	hasEquippedMiningTool = function()
+		return true
+	end
     hasEquippedWeapon = function()
         local character = getCharacter()
 
@@ -85,25 +88,37 @@ function AutoMiner.run(State)
             return true
         end
 
-        if mode == "mining" then
-            print("[AutoMiner] Switch mode -> mining")
+        -- if mode == "mining" then
+        --     print("[AutoMiner] Switch mode -> mining")
 
-            local pressed = pressKey(Enum.KeyCode.One)
-            if not pressed then
-                warn("[AutoMiner] Failed to press key 1")
-                return false
-            end
+        --     local pressed = pressKey(Enum.KeyCode.One)
+        --     if not pressed then
+        --         warn("[AutoMiner] Failed to press key 1")
+        --         return false
+        --     end
 
-            local ok = waitForEquippedObject(hasEquippedMiningTool, 2)
-            if ok then
-                currentMode = mode
-                print("[AutoMiner] Mining tool equipped:", ok.Name)
-                return true
-            else
-                warn("[AutoMiner] Mining tool not found after pressing 1")
-                return false
-            end
+        --     local ok = waitForEquippedObject(hasEquippedMiningTool, 2)
+        --     if ok then
+        --         currentMode = mode
+        --         print("[AutoMiner] Mining tool equipped:", ok.Name)
+        --         return true
+        --     else
+        --         warn("[AutoMiner] Mining tool not found after pressing 1")
+        --         return false
+        --     end
 
+		if mode == "mining" then
+			print("[AutoMiner] Switch mode -> mining")
+
+			local pressed = pressKey(Enum.KeyCode.One)
+			if not pressed then
+				warn("[AutoMiner] Failed to press key 1")
+				return false
+			end
+
+			currentMode = mode
+			task.wait(0.2) -- เผื่อเวลา equip นิดนึง
+			return true
         elseif mode == "combat" then
             print("[AutoMiner] Switch mode -> combat")
 
@@ -112,16 +127,18 @@ function AutoMiner.run(State)
                 warn("[AutoMiner] Failed to press key 2")
                 return false
             end
-
-            local ok = waitForEquippedObject(hasEquippedWeapon, 2)
-            if ok then
-                currentMode = mode
-                print("[AutoMiner] Weapon equipped:", ok.Name)
-                return true
-            else
-                warn("[AutoMiner] Weapon not found after pressing 2")
-                return false
-            end
+			currentMode = mode
+			task.wait(0.2) -- เผื่อเวลา equip นิดนึง
+			return true
+            -- local ok = waitForEquippedObject(hasEquippedWeapon, 2)
+            -- if ok then
+            --     currentMode = mode
+            --     print("[AutoMiner] Weapon equipped:", ok.Name)
+            --     return true
+            -- else
+            --     warn("[AutoMiner] Weapon not found after pressing 2")
+            --     return false
+            -- end
         end
 
         return false
@@ -182,21 +199,26 @@ function AutoMiner.run(State)
 		)
 
 		local groundY = getGroundYNear(
-			Vector3.new(desiredXZ.X, targetPos.Y + 6, desiredXZ.Z),
+			Vector3.new(desiredXZ.X, math.max(targetPos.Y, myPos.Y) + 8, desiredXZ.Z),
 			{character, targetPart.Parent}
 		)
 
-		local finalY
+		local finalY = myPos.Y
 
-		if groundY and math.abs(groundY - myPos.Y) <= 8 then
-			finalY = groundY + 2
-		else
-			-- ใช้ระดับเราเดิม ไม่ใช่ระดับหัวแร่
+		-- ยอม snap ลงพื้นเฉพาะกรณีต่างจากระดับเราไม่มาก
+		if groundY and math.abs(groundY - myPos.Y) <= 4 then
+			finalY = groundY + 3
+		end
+
+		-- ห้ามต่ำกว่าระดับเราเยอะเกิน
+		if finalY < myPos.Y - 2 then
 			finalY = myPos.Y
 		end
 
-		-- clamp ไม่ให้สูงเกินเป้าหมายมาก
-		finalY = math.min(finalY, targetPos.Y + 2)
+		-- ห้ามสูง/ต่ำตาม target มากเกินไป
+		if math.abs(finalY - myPos.Y) > 4 then
+			finalY = myPos.Y
+		end
 
 		return Vector3.new(desiredXZ.X, finalY, desiredXZ.Z)
 	end
@@ -737,20 +759,36 @@ function AutoMiner.run(State)
 		local ok, err = pcall(function()
 			local _, _, hrp = getCharacterParts()
 
-			local standPos = getSafeStandPositionNearTarget(targetPart, stopDistance or 4)
-			if not standPos then
-				return
+			local targetPos = targetPart.Position
+			local myPos = hrp.Position
+
+			local flatDir = Vector3.new(
+				targetPos.X - myPos.X,
+				0,
+				targetPos.Z - myPos.Z
+			)
+
+			if flatDir.Magnitude <= 0.05 then
+				flatDir = Vector3.new(0, 0, -1)
+			else
+				flatDir = flatDir.Unit
 			end
+
+			local finalPos = Vector3.new(
+				targetPos.X - flatDir.X * (stopDistance or 4),
+				targetPos.Y,
+				targetPos.Z - flatDir.Z * (stopDistance or 4)
+			)
 
 			noclip(true)
 
-			local dist = (standPos - hrp.Position).Magnitude
+			local dist = (finalPos - hrp.Position).Magnitude
 			local tweenTime = math.max(dist / 55, 0.15)
 
 			tween = TweenService:Create(
 				hrp,
 				TweenInfo.new(tweenTime, Enum.EasingStyle.Linear),
-				{ CFrame = CFrame.new(standPos) }
+				{CFrame = CFrame.new(finalPos)}
 			)
 
 			tween:Play()
@@ -770,7 +808,7 @@ function AutoMiner.run(State)
 			end
 
 			local _, _, hrp2 = getCharacterParts()
-			success = (hrp2.Position - standPos).Magnitude <= 6
+			success = (hrp2.Position - finalPos).Magnitude <= 6
 		end)
 
 		noclip(false)
