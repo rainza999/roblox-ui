@@ -475,7 +475,7 @@ function AutoMonster.run(State)
 
 		local ok, err = pcall(function()
 			local _, _, hrp = getCharacterParts()
-			speed = math.clamp(speed or 55, 50, 60)
+			speed = math.clamp(speed or 45, 40, 50)
 
 			cancelTween()
 			startNoclip()

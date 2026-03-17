@@ -524,7 +524,7 @@ function AutoAttackBoss.run(State)
 		local dist = (cf.Position - hrp.Position).Magnitude
 		noclip(true)
 
-		local tween = TweenService:Create(hrp, TweenInfo.new(math.max(dist / 60, 0.1)), {CFrame = cf})
+		local tween = TweenService:Create(hrp, TweenInfo.new(math.max(dist / 40, 0.1)), {CFrame = cf})
 		tween:Play()
 
 		while tween.PlaybackState == Enum.PlaybackState.Playing do

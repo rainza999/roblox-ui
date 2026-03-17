@@ -783,7 +783,7 @@ function AutoMiner.run(State)
 			noclip(true)
 
 			local dist = (finalPos - hrp.Position).Magnitude
-			local tweenTime = math.max(dist / 55, 0.15)
+			local tweenTime = math.max(dist / 45, 0.15)
 
 			tween = TweenService:Create(
 				hrp,
