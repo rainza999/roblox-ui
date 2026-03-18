@@ -22,17 +22,18 @@ local State = {
 	clearStatusText = "",
 
 	selectedLocations = {
-		["2s"] = true,
+		["2s"] = false,
 		["I4_HolyCave_03_1"] = false,
-		["I4_HolyCave_03_2"] = true,
+		["I4_HolyCave_03_2"] = false,
 		["Island3CavePeakBarrier"] = false,
 		["Island3CavePeakEnd"] = false,
 		["Island3RedCave"] = false,
+		["Island2VolcanicDepths"] = false,
 	},
 
 	selectedMinerals = {
-		["Blossom Boulder"] = true,
-		["Glowy Rock"] = true,
+		["Blossom Boulder"] = false,
+		["Glowy Rock"] = false,
 		["Floating Crystal"] = false,
 		["Heart Of The Island"] = false,
 		["Large Red Crystal"] = false,
@@ -40,6 +41,9 @@ local State = {
 		["Medium Red Crystal"] = false,
 		["Medium Ice Crystal"] = false,
 		["Small Red Crystal"] = false,
+		["Volcanic Rock"] = false,
+		["Basalt Vein"] = false,
+		["Basalt Core"] = false,
 	},
 
 	selectedOres = {
@@ -56,6 +60,10 @@ local State = {
 		["Duranite"] = false,
 		["Iceite"] = false,
 		["Velchire"] = false,
+		["Demonite Ore"] = false,
+		["Darkryte"] = false,
+		["Eye Ore"] = false,
+		["Magmaite Ore"] = false,
 	},
 
 	clearLimits = {
@@ -68,6 +76,9 @@ local State = {
 		["Medium Red Crystal"] = 0,
 		["Medium Ice Crystal"] = 0,
 		["Small Red Crystal"] = 0,
+		["Volcanic Rock"] = 0,
+		["Basalt Vein"] = 0,
+		["Basalt Core"] = 0,
 	},
 
 	selectedMonsters = {
@@ -92,6 +103,12 @@ local State = {
 		["Diamond Spider"] = false,
 		["Prismarine Spider"] = false,
 
+		["Reaper"] = false,
+		["Elite Rogue Skeleton"] = false,
+		["Elite Deathaxe Skeleton"] = false,
+		["Blight Pyromancer"] = false,
+		["Blazing Slime"] = false,
+
 	},
 
 	monsterPriority = {
@@ -115,6 +132,12 @@ local State = {
 		"Crystal Spider",
 		"Diamond Spider",
 		"Prismarine Spider",
+
+		"Reaper",
+		"Elite Rogue Skeleton",
+		"Elite Deathaxe Skeleton",
+		"Blight Pyromancer",
+		"Blazing Slime",
 	},
 
 	activeController = nil,

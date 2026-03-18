@@ -23,6 +23,7 @@ function UI.create(state)
 		"Island3CavePeakBarrier",
 		"Island3CavePeakEnd",
 		"Island3RedCave",
+		"Island2VolcanicDepths",
 	}
 
 	local mineralNames = {
@@ -36,6 +37,10 @@ function UI.create(state)
 		"Medium Ice Crystal",
 		"Small Red Crystal",
 		"Small Ice Crystal",
+
+		"Volcanic Rock",
+		"Basalt Vein",
+		"Basalt Core",
 	}
 
 	local oreNames = {
@@ -52,6 +57,11 @@ function UI.create(state)
 		"Etherealite",
 		"Iceite",
 		"Velchire",
+
+		"Demonite Ore",
+		"Darkryte",
+		"Eye Ore",
+		"Magmaite Ore",
 	}
 
 	local monsterNames = {
@@ -74,6 +84,12 @@ function UI.create(state)
 		"Crystal Spider",
 		"Diamond Spider",
 		"Prismarine Spider",
+
+		"Reaper",
+		"Elite Rogue Skeleton",
+		"Elite Deathaxe Skeleton",
+		"Blight Pyromancer",
+		"Blazing Slime",
 	}
 
 	state.selectedLocations = state.selectedLocations or {}
@@ -232,6 +248,9 @@ function UI.create(state)
 		if hasGlowyRock and hasBruteOni then
 			return "world4"
 		end
+
+		local hasBasaltCore = hasAliveMineral("Basalt Core")
+		local hasAxeSkeleton = hasAliveMonster("Axe Skeleton")
 
 		return "unknown"
 	end
