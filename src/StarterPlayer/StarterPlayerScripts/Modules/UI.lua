@@ -252,6 +252,10 @@ function UI.create(state)
 		local hasBasaltCore = hasAliveMineral("Basalt Core")
 		local hasAxeSkeleton = hasAliveMonster("Axe Skeleton")
 
+		if hasBasaltCore and hasAxeSkeleton then
+			return "world2"
+		end
+
 		return "unknown"
 	end
 

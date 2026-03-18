@@ -47,11 +47,11 @@ local State = {
 	},
 
 	selectedOres = {
-		["Onyx"] = true,
-		["Heavenly Orb"] = true,
-		["Lucky Cat"] = true,
-		["Azuryxite"] = true,
-		["Heavenite"] = true,
+		["Onyx"] = false,
+		["Heavenly Orb"] = false,
+		["Lucky Cat"] = false,
+		["Azuryxite"] = false,
+		["Heavenite"] = false,
 		["Heart Of The Island"] = false,
 		["Stolen Heart"] = false,
 		["Gargantuan"] = false,
@@ -60,10 +60,10 @@ local State = {
 		["Duranite"] = false,
 		["Iceite"] = false,
 		["Velchire"] = false,
-		["Demonite Ore"] = false,
-		["Darkryte"] = false,
-		["Eye Ore"] = false,
-		["Magmaite Ore"] = false,
+		["Demonite Ore"] = true,
+		["Darkryte"] = true,
+		["Eye Ore"] = true,
+		["Magmaite Ore"] = true,
 	},
 
 	clearLimits = {
