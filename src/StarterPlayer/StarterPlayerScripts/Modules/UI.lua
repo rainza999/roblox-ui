@@ -42,6 +42,7 @@ function UI.create(state)
 		"Onyx",
 		"Heavenly Orb",
 		"Lucky Cat",
+		"Azuryxite",
 		"Heavenite",
 		"Heart Of The Island",
 		"Stolen Heart",
